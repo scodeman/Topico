@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { sampleModel } from '../model/sample';
 import { computeView, groupTopicId, type ViewOptions } from './view';
+import { normalizeModel } from '../model/types';
 import { layoutView, type Rect } from './layout';
 
 const base: ViewOptions = { filterSystems: [], filterTopics: [], collapseBy: 'none', sharedOnly: true };
@@ -23,7 +24,7 @@ describe('computeView', () => {
     const vm = view({ filterSystems: ['n1'] });
     expect(Object.keys(vm.nodes).sort()).toEqual(['n1', 'xw1']);
     expect(vm.nodes.n1.tabs.map((t) => t.topicId).sort()).toEqual(['t1', 't10', 't2', 't3', 't4', 't5', 't6', 't7']);
-    expect(vm.edges.some((e) => e.from.nodeId === 'n1' && e.to.nodeId === 'xw1' && e.topicId === 't5')).toBe(true);
+    expect(vm.edges.some((e) => e.from.nodeId === 'n1' && e.to.nodeId === 'xw1' && e.topicIds.includes('t5'))).toBe(true);
     expect(vm.stubs.length).toBeGreaterThan(0);
   });
 
@@ -67,6 +68,46 @@ describe('computeView', () => {
   });
 });
 
+describe('functional chains (endpoint membership)', () => {
+  const order = groupTopicId('c-order');
+
+  it('colours only the arrows whose two endpoints are in the chain', () => {
+    const vm = view();
+    const t5 = vm.edges.filter((e) => e.topicIds.includes('t5'));
+    expect(t5.find((e) => e.to.nodeId === 'xw1')!.chainId).toBe('c-order');
+    expect(t5.find((e) => e.to.nodeId === 's1')!.chainId).toBeNull();
+  });
+
+  it('focusing a chain shows only its endpoints, not every endpoint of its topics', () => {
+    const vm = view({ filterTopics: [order] });
+    expect(Object.keys(vm.nodes).sort()).toEqual(['n1', 'w2', 'xw1']);
+    expect(vm.nodes.w2.tabs.map((t) => t.topicId)).toEqual(['t10']);
+    // TOPIC 5 / TOPIC 10 also flow to systems outside the chain: shown as stubs.
+    expect(vm.stubs.length).toBeGreaterThan(0);
+  });
+
+  it('collapsing by chain merges only chain endpoints and keeps other flows connected', () => {
+    const vm = view({ collapseBy: 'chain' });
+    expect(vm.nodes.xw1.tabs.map((t) => t.topicId)).toEqual([order]);
+    // NORTH SYS 1 has TOPIC 5 in the chain but TOPIC 6 outside it.
+    const n1 = vm.nodes.n1.tabs.map((t) => t.topicId);
+    expect(n1).toContain(order);
+    expect(n1).toContain('t6');
+    // SOUTH SYS 1 consumes TOPIC 5 outside the chain: its plain tab is fed by NORTH SYS 1's chain tab.
+    expect(vm.edges.some((e) => e.from.nodeId === 'n1' && e.from.tabId === order && e.to.nodeId === 's1' && e.to.tabId === 't5')).toBe(true);
+  });
+
+  it('migrates topic-level chains from older files onto every endpoint of the topic', () => {
+    const m = normalizeModel({
+      topics: [{ id: 't', name: 'T', chainId: 'c' }],
+      interactions: [{ id: 'i1', systemId: 's', topicId: 't', direction: 'produce' }],
+      groups: [{ id: 'c', name: 'C', type: 'chain' }],
+    });
+    expect(m.interactions[0].chainId).toBe('c');
+    expect('chainId' in m.topics[0]).toBe(false);
+  });
+});
+
 describe('layoutView', () => {
   const scenarios: Partial<ViewOptions>[] = [
     {},
@@ -74,6 +115,8 @@ describe('layoutView', () => {
     { filterSystems: ['w11', 'n1'] },
     { filterTopics: ['t3'] },
     { collapseBy: 'chain' },
+    { collapseBy: 'bundle' },
+    { filterTopics: [groupTopicId('c-billing')] },
   ];
   it.each(scenarios)('produces no overlapping system boxes for %j', (o) => {
     const l = layoutView(view(o));

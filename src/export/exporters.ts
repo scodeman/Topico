@@ -19,10 +19,7 @@ const SKETCH = 'sketch=1;curveFitting=1;jiggle=2;fontFamily=Architects Daughter;
 export function toDrawio(layout: Layout, vm: ViewModel, groups: Group[], opts: { sketch: boolean; showStubs: boolean; title: string }): string {
   const sk = opts.sketch ? SKETCH : '';
   const colorOf = new Map(groups.map((g) => [g.id, g.color]));
-  const chainColor = (topicId: string) => {
-    const c = vm.topics[topicId]?.chainId;
-    return (c && colorOf.get(c)) || undefined;
-  };
+  const chainColor = (chainId: string | null | undefined) => (chainId && colorOf.get(chainId)) || undefined;
   const cells: string[] = [];
   const vertex = (id: string, value: string, style: string, x: number, y: number, w: number, h: number) =>
     cells.push(
@@ -55,7 +52,7 @@ export function toDrawio(layout: Layout, vm: ViewModel, groups: Group[], opts: {
     const [p0, c1, c2, p3] = e.points;
     const ex = rel(from, p0);
     const en = rel(to, p3);
-    const color = chainColor(e.topicId) ?? COLORS.muted;
+    const color = chainColor(e.chainId) ?? COLORS.muted;
     const style = `curved=1;html=1;endArrow=classic;endFill=1;strokeColor=${color};exitX=${ex.x};exitY=${ex.y};exitDx=0;exitDy=0;exitPerimeter=0;entryX=${en.x};entryY=${en.y};entryDx=0;entryDy=0;entryPerimeter=0;${sk}`;
     cells.push(
       `<mxCell id="${esc(`e:${e.id}`)}" style="${esc(style)}" edge="1" parent="1" source="${esc(tabId(from))}" target="${esc(tabId(to))}"><mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="${c1.x}" y="${c1.y}"/><mxPoint x="${c2.x}" y="${c2.y}"/></Array></mxGeometry></mxCell>`,
@@ -74,7 +71,7 @@ export function toDrawio(layout: Layout, vm: ViewModel, groups: Group[], opts: {
 
   for (const n of layout.nodes) {
     for (const t of n.tabs) {
-      const fill = chainColor(t.topicId);
+      const fill = chainColor(t.chainIds[0]);
       const style = `rounded=0;whiteSpace=wrap;html=1;fontSize=10;fillColor=${fill ? `${fill}38` : '#ffffff'};strokeColor=${COLORS.ink};${t.vertical ? 'horizontal=0;' : ''}${vm.topics[t.topicId]?.isGroup ? 'dashed=1;' : ''}${sk}`;
       vertex(tabId(t), vm.topics[t.topicId]?.name ?? t.topicId, style, t.rect.x, t.rect.y, t.rect.w, t.rect.h);
     }

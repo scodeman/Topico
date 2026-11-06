@@ -19,7 +19,8 @@ npm run build
 | **System** / **Exe** | Attached to a centre border (West, North, East, South), or *upstream* of another system, in which case it sits on that system's outer border in the same direction. |
 | **Topic** | Drawn as a tab on the border between a system and its parent. |
 | **Interaction** | A system *produces* or *consumes* a topic. The direction is always relative to the system's parent (the broker, or the upstream system it hangs off). |
-| **Bundle** / **Functional chain** | Named, coloured groups of topics. A bundle is drawn as an outline around adjacent tabs. A chain colours the tabs and arrows. |
+| **Bundle** | A named group of whole topics. It is drawn as an outline around adjacent tabs. |
+| **Functional chain** | A named group of individual endpoints (this system producing or consuming this topic). The same topic can be in a chain at one system and outside it at another. The chain colours its endpoint tabs, and colours the arrows that link two of its endpoints. |
 
 Arrows are derived automatically. Inside each container (the broker or a system), every producer of a topic points to every consumer of that topic. A system relays a topic to its upstream systems: what it consumes from the broker it passes to its children, and the reverse.
 
@@ -34,6 +35,11 @@ The model is saved automatically in the browser (localStorage). Use **Save JSON*
   - Topics: only the systems that produce or consume them.
   - The broker, or **Show all**: everything.
 - Dashed arrows (*Off-view flows*) show that a topic also flows to or from systems outside the current focus.
+- In the left panel:
+  - Drag a system by its ⋮⋮ handle. Drop it above or below another row to reorder, on a border heading to move it to that border, or on the middle of a row to make it upstream of that system. The canvas follows the order in the left panel.
+  - Topics: drag topics to reorder them. The sort button in the section header shows ↑ (A–Z), ↓ (Z–A) or ↕ (custom order). Click it to sort A–Z, or Z–A when the list is already A–Z.
+  - Double-click any item to rename it.
+  - Right-click any item for Rename, Duplicate and Delete.
 - ● / ◌ hides or shows a system (with its upstream systems) or a topic. Single interactions can be hidden from the system or topic pane.
 - **Group topics** collapses topics into one tab per bundle or per functional chain.
 - The layout is recomputed on every change. It sizes boxes to their content, reorders tabs to reduce crossings and keeps bundle members together, and it never lets boxes overlap.

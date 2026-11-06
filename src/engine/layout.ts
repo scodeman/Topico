@@ -33,8 +33,10 @@ export interface Rect {
 export interface TabGeom {
   key: string;
   nodeId: string;
+  /** View-topic id (topic, or collapsed group). */
   topicId: string;
   role: Role;
+  chainIds: string[];
   rect: Rect;
   vertical: boolean;
   inner: Vec;
@@ -55,7 +57,9 @@ export interface NodeGeom {
 
 export interface EdgeGeom {
   id: string;
-  topicId: string;
+  /** Model topics carried by the arrow. */
+  topicIds: string[];
+  chainId: string | null;
   container: string;
   d: string;
   points: [Vec, Vec, Vec, Vec];
@@ -65,6 +69,7 @@ export interface EdgeGeom {
 
 export interface StubGeom {
   id: string;
+  /** View-topic id of the tab the stub starts from. */
   topicId: string;
   d: string;
   outgoing: boolean;
@@ -158,6 +163,7 @@ function layoutOnce(vm: ViewModel, tabOrder: Map<string, string[]>): Layout {
         nodeId: n.id,
         topicId: t.topicId,
         role: t.role,
+        chainIds: t.chainIds,
         rect: r,
         vertical: axis === 'y',
         inner: vec(gapCentre - (sign * K.TAB_L) / 2, am),
@@ -187,34 +193,35 @@ function layoutOnce(vm: ViewModel, tabOrder: Map<string, string[]>): Layout {
   }
 
   const tabs = new Map(nodes.flatMap((n) => n.tabs.map((t) => [t.key, t] as const)));
-  const anchor = (e: Endpoint, topicId: string) => {
-    const t = tabs.get(tabKey(e.nodeId, topicId))!;
+  const anchor = (e: Endpoint) => {
+    const t = tabs.get(tabKey(e.nodeId, e.tabId))!;
     return e.end === 'inner' ? { p: t.inner, n: t.innerNormal } : { p: t.outer, n: t.outerNormal };
   };
 
   const edges: EdgeGeom[] = vm.edges.map((e) => {
-    const a = anchor(e.from, e.topicId);
-    const b = anchor(e.to, e.topicId);
+    const a = anchor(e.from);
+    const b = anchor(e.to);
     const dist = Math.hypot(b.p.x - a.p.x, b.p.y - a.p.y);
     const k = Math.min(220, Math.max(36, dist * 0.45));
     const c1 = { x: a.p.x + a.n.x * k, y: a.p.y + a.n.y * k };
     const c2 = { x: b.p.x + b.n.x * k, y: b.p.y + b.n.y * k };
     return {
       id: e.id,
-      topicId: e.topicId,
+      topicIds: e.topicIds,
+      chainId: e.chainId,
       container: e.container,
       d: `M${r(a.p.x)},${r(a.p.y)} C${r(c1.x)},${r(c1.y)} ${r(c2.x)},${r(c2.y)} ${r(b.p.x)},${r(b.p.y)}`,
       points: [a.p, c1, c2, b.p],
-      fromKey: tabKey(e.from.nodeId, e.topicId),
-      toKey: tabKey(e.to.nodeId, e.topicId),
+      fromKey: tabKey(e.from.nodeId, e.from.tabId),
+      toKey: tabKey(e.to.nodeId, e.to.tabId),
     };
   });
 
   const stubs: StubGeom[] = vm.stubs.map((s) => {
-    const { p, n } = anchor(s.at, s.topicId);
+    const { p, n } = anchor(s.at);
     const q = { x: p.x + n.x * K.STUB_LEN, y: p.y + n.y * K.STUB_LEN };
     const [from, to] = s.outgoing ? [p, q] : [q, p];
-    return { id: s.id, topicId: s.topicId, d: `M${r(from.x)},${r(from.y)} L${r(to.x)},${r(to.y)}`, outgoing: s.outgoing };
+    return { id: s.id, topicId: s.at.tabId, d: `M${r(from.x)},${r(from.y)} L${r(to.x)},${r(to.y)}`, outgoing: s.outgoing };
   });
 
   const brackets: BundleBracket[] = [];

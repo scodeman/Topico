@@ -503,7 +503,7 @@
           <mxGeometry height="30" width="260" x="450.5" y="850" as="geometry" />
         </mxCell>
         <mxCell id="7rJXidjt-eiVOBV0fCX7-218" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;rounded=0;" value="WHEN SELECTING NOTHING OR&amp;nbsp;&lt;span style=&quot;background-color: transparent; color: light-dark(#000000, var(--ge-light-color, #ffffff));&quot;&gt;&lt;b&gt;CENTER SYS&lt;/b&gt;&amp;nbsp;ONLY&lt;/span&gt;" vertex="1">
-          <mxGeometry height="30" width="310" x="-190" y="-150" as="geometry" />
+          <mxGeometry height="30" width="310" x="-40" y="-40" as="geometry" />
         </mxCell>
         <mxCell id="7rJXidjt-eiVOBV0fCX7-219" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;rounded=0;" value="WHEN SELECTING &lt;b&gt;TOPIC 3&lt;/b&gt;" vertex="1">
           <mxGeometry height="30" width="260" x="1070" y="860" as="geometry" />

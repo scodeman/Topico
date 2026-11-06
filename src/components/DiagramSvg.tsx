@@ -1,5 +1,5 @@
 import type { CSSProperties, MouseEvent, SVGProps } from 'react';
-import { labelArea, type Layout, type NodeGeom, type Rect, type TabGeom } from '../engine/layout';
+import { labelArea, type EdgeGeom, type Layout, type NodeGeom, type Rect, type TabGeom } from '../engine/layout';
 import type { ViewModel } from '../engine/view';
 import type { Group } from '../model/types';
 
@@ -45,17 +45,17 @@ const truncate = (s: string, max: number) => (s.length > max ? `${s.slice(0, Mat
 export function DiagramSvg(p: DiagramProps) {
   const { layout, vm, groups, handlers, animate } = p;
   const groupColor = new Map(groups.map((g) => [g.id, g.color]));
-  const chainColor = (topicId: string) => {
-    const c = vm.topics[topicId]?.chainId;
-    return c ? groupColor.get(c) : undefined;
-  };
+  const chainColor = (chainId: string | null | undefined) => (chainId ? groupColor.get(chainId) : undefined);
   const active = p.hoverTopic ?? null;
   const dim = (topicId: string) => (active && active !== topicId ? 0.12 : 1);
+  // An arrow is highlighted when hovering one of its tabs or one of the topics it carries.
+  const edgeHit = (e: EdgeGeom) =>
+    !active || e.topicIds.includes(active) || e.fromKey.endsWith(`|${active}`) || e.toKey.endsWith(`|${active}`);
   const t = animate ? 'transform .35s ease, width .35s ease, height .35s ease, opacity .2s' : undefined;
   const move = (r: Rect): CSSProperties | undefined => (animate ? { transform: `translate(${r.x}px,${r.y}px)`, transition: t } : undefined);
   const at = (r: Rect) => (animate ? undefined : `translate(${r.x},${r.y})`);
   const b = layout.bounds;
-  const edgeColors = [...new Set(layout.edges.map((e) => chainColor(e.topicId) ?? COLORS.muted))];
+  const edgeColors = [...new Set(layout.edges.map((e) => chainColor(e.chainId) ?? COLORS.muted))];
 
   const node = (n: NodeGeom) => {
     const sel = p.selectedNodes?.has(n.id);
@@ -91,7 +91,7 @@ export function DiagramSvg(p: DiagramProps) {
   const tab = (tg: TabGeom) => {
     const topic = vm.topics[tg.topicId];
     const sel = p.selectedTopics?.has(tg.topicId);
-    const fill = chainColor(tg.topicId);
+    const fill = chainColor(tg.chainIds[0]);
     const { w, h } = tg.rect;
     const label = truncate(topic?.name ?? tg.topicId, 15);
     return (
@@ -104,7 +104,7 @@ export function DiagramSvg(p: DiagramProps) {
         onMouseEnter={handlers ? () => handlers.onHoverTopic(tg.topicId) : undefined}
         onMouseLeave={handlers ? () => handlers.onHoverTopic(null) : undefined}
       >
-        <title>{`${topic?.name ?? tg.topicId} — ${tg.role}`}</title>
+        <title>{`${topic?.name ?? tg.topicId} — ${tg.role}${tg.chainIds.length ? ` — chain: ${tg.chainIds.map((c) => groups.find((g) => g.id === c)?.name).join(', ')}` : ''}`}</title>
         <rect width={w} height={h} fill={COLORS.nodeFill} stroke={sel ? COLORS.accent : COLORS.ink} strokeWidth={sel ? 2.4 : 1} />
         {fill && <rect width={w} height={h} fill={fill} fillOpacity={0.22} />}
         {topic?.isGroup && <rect x={2} y={2} width={w - 4} height={h - 4} fill="none" stroke={COLORS.ink} strokeDasharray="2 2" strokeWidth={0.8} />}
@@ -170,15 +170,16 @@ export function DiagramSvg(p: DiagramProps) {
 
       <g fill="none">
         {layout.edges.map((e) => {
-          const c = chainColor(e.topicId) ?? COLORS.muted;
+          const c = chainColor(e.chainId) ?? COLORS.muted;
+          const hit = edgeHit(e);
           return (
             <path
               key={e.id}
               d={e.d}
               stroke={c}
-              strokeWidth={active === e.topicId ? 2.2 : 1.3}
+              strokeWidth={active && hit ? 2.2 : e.chainId ? 1.8 : 1.3}
               markerEnd={`url(#${markerId(c)})`}
-              opacity={dim(e.topicId) * 0.9}
+              opacity={(hit ? 1 : 0.12) * 0.9}
               style={animate ? { d: `path("${e.d}")`, transition: 'd .35s ease, opacity .2s' } as CSSProperties : undefined}
             />
           );

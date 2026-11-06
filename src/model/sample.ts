@@ -26,13 +26,12 @@ export function sampleModel(): Model {
   const bundleRef = 'b-ref';
   const chainOrder = 'c-order';
   const chainBilling = 'c-billing';
-  const topic = (n: number, bundleId: string | null = null, chainId: string | null = null): Topic => ({
-    id: `t${n}`, name: `TOPIC ${n}`, description: '', owner: '', format: 'Avro', properties: [], bundleId, chainId, hidden: false,
+  const topic = (n: number, bundleId: string | null = null): Topic => ({
+    id: `t${n}`, name: `TOPIC ${n}`, description: '', owner: '', format: 'Avro', properties: [], bundleId, hidden: false,
   });
   const topics: Topic[] = [
     topic(1, bundleRef), topic(2, bundleRef), topic(3, bundleRef), topic(4, bundleRef),
-    topic(5, null, chainOrder), topic(6, null, chainOrder), topic(7), topic(8, null, chainBilling),
-    topic(9, null, chainBilling), topic(10, null, chainOrder),
+    topic(5), topic(6), topic(7), topic(8), topic(9), topic(10),
   ];
 
   const flows: [string, Direction, number[]][] = [
@@ -59,8 +58,17 @@ export function sampleModel(): Model {
     ['s1', 'produce', [9]],
     ['s1', 'consume', [1, 2, 3, 4, 5, 6, 7, 8, 10]],
   ];
+  // Functional chains pick individual endpoints: e.g. TOPIC 5 is in "Order flow" only between NORTH SYS 1 and ETL W1.
+  const chains: Record<string, string> = {
+    'n1-p-5': chainOrder, 'xw1-c-5': chainOrder, 'xw1-p-10': chainOrder, 'w2-c-10': chainOrder,
+    'n2-p-8': chainBilling, 'n21-p-8': chainBilling, 'e1-c-8': chainBilling, 'e11-c-8': chainBilling,
+    's1-p-9': chainBilling, 'e12-c-9': chainBilling,
+  };
   const interactions = flows.flatMap(([systemId, direction, nums]) =>
-    nums.map((n) => ({ id: `i-${systemId}-${direction[0]}-${n}`, systemId, topicId: `t${n}`, direction, hidden: false })),
+    nums.map((n) => {
+      const key = `${systemId}-${direction[0]}-${n}`;
+      return { id: `i-${key}`, systemId, topicId: `t${n}`, direction, hidden: false, chainId: chains[key] ?? null };
+    }),
   );
 
   return {

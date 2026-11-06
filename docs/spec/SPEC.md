@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Version | 0.1 (initial build) |
+| Version | 0.5 |
 | Last updated | 2026-11-07 |
 | Reference material | [`images/`](images/) (hand-drawn target views), [`Topico.drawio`](Topico.drawio) (source sketch) |
 
@@ -33,8 +33,9 @@ Topico draws the systems that produce and consume topics around a central broker
 | **Leaf** | A system with no upstream systems of its own. |
 | **Topic** | A message stream. It is drawn as a tab on the border between a system and its parent. |
 | **Interaction** | One system producing or consuming one topic. |
-| **Bundle** | A named group of topics that belong together, for example "Reference data". |
-| **Functional chain** | A named group of topics that make up one business flow, for example "Order flow". |
+| **Endpoint** | One system or exe producing or consuming one topic. Same as an interaction. |
+| **Bundle** | A named group of **whole topics** that belong together, for example "Reference data". Every endpoint of a bundled topic is in the bundle. |
+| **Functional chain** | A named group of **individual endpoints** that make up one business flow, for example "Order flow". A topic can be in a chain at some systems and outside it at others. |
 | **Focus / filter** | The current selection that limits what the diagram shows. |
 
 ## 3. Reference views
@@ -103,11 +104,13 @@ The built-in sample model (toolbar button **Sample**) recreates ALL.png.
 
 | ID | Requirement | Status | Notes |
 |---|---|---|---|
-| GRP-01 | Topics can be grouped into bundles. | Done | A topic belongs to at most one bundle. |
-| GRP-02 | Topics can be grouped into functional chains. | Done | A topic belongs to at most one chain, and can be in both a bundle and a chain. |
-| GRP-03 | Group membership is visible on the diagram. | Done | Bundles are drawn as a coloured outline around adjacent tabs. Chains colour the tab fill and the arrows. A legend is shown on the canvas. |
-| GRP-04 | The view can collapse each bundle or each chain into a single tab. | Done (tested) | Toolbar menu *Group topics*: individually, by bundle, or by functional chain. |
-| GRP-05 | The user can focus the view on a whole group. | Done | Left panel checkbox on the group. |
+| GRP-01 | A bundle groups a complete set of topics. Membership belongs to the topic, so it applies to every system that produces or consumes the topic. | Done | A topic belongs to at most one bundle. |
+| GRP-02 | A functional chain groups individual endpoints: for each system producing or consuming a topic, the user chooses whether that endpoint is in the chain. This is what makes a chain different from a bundle. | Done (tested) | An endpoint belongs to at most one chain (**design decision**, see §7). An endpoint can be in a chain while its topic is also in a bundle. |
+| GRP-03 | Chain membership can be edited from the system pane, the topic pane, and the chain's own pane. | Done | System pane: a chain picker on each produced or consumed topic. Topic pane: a chain picker on each producer and consumer. Chain pane: endpoints listed by topic, with checkboxes. |
+| GRP-04 | Group membership is visible on the diagram. | Done | Bundles are drawn as a coloured outline around adjacent tabs. A chain colours the tabs of its endpoints, and colours an arrow only when both of its ends are in the chain, so the chain's path is visible. A legend is shown on the canvas. |
+| GRP-05 | The view can collapse each bundle, or each chain, into a single tab per system. | Done (tested) | Toolbar menu *Group topics*. Collapsing by chain merges only the chain's endpoints. Flows that leave the chain stay connected to the plain topic tabs. |
+| GRP-06 | The user can focus the view on a whole group. | Done (tested) | Left panel checkbox on the group, or "Focus view" in the group pane. Focusing a bundle shows every endpoint of its topics. Focusing a chain shows only the chain's endpoints, with dashed stubs for the topics' other flows. |
+| GRP-07 | Files saved before chains became endpoint-based still load. | Done (tested) | A chain stored on a topic is copied to every endpoint of that topic when the file is loaded. |
 
 ### 4.6 Automatic layout
 
@@ -119,10 +122,23 @@ The built-in sample model (toolbar button **Sample**) recreates ALL.png.
 | LAY-04 | Tabs are ordered to reduce crossing arrows. | Done | Two-pass barycentre heuristic. Tabs of the same bundle stay next to each other. |
 | LAY-05 | Changes are animated so the user can follow what moved. | Done | CSS transitions. Animation of arrow paths depends on the browser supporting CSS `d` transitions. |
 | LAY-06 | Labels are never hidden under tabs. | Done | Labels are placed in the part of the box that tabs do not cover, and long names wrap. |
-| LAY-07 | The user can control the order of systems along a border. | **Open** | Systems are placed in the order they were created. |
+| LAY-07 | The user can control the order of systems along a border. | Done (tested) | By drag and drop in the left panel (EXL-01). The order in the left panel is the order on the canvas. |
 | LAY-08 | Arrows avoid crossing boxes and labels. | **Open** | Arrows are curves between tab ends and can pass over the broker's label. |
 
-### 4.7 Details pane
+### 4.7 Left panel (explorer)
+
+| ID | Requirement | Status | Notes |
+|---|---|---|---|
+| EXL-01 | In the Systems section, the user can drag a system to change its order within its parent section. The canvas reorders the systems on that border to match. | Done (tested) | Drop on the top or bottom edge of a row to place the system before or after it. Checked in Chrome. |
+| EXL-02 | The user can drag a system to another border. Its upstream systems move with it, and the canvas updates. | Done (tested) | Drop on a border heading (West, North, East, South) to add it at the end of that border. All four headings are always shown, even when empty, so they can be dropped on. Dropping next to a system on another border also moves it there. |
+| EXL-03 | The user can drag a system onto another system to make it upstream of that system. | Done (tested) | Drop on the middle of a row. Not in the original request, but it uses the same gesture. A system cannot be dropped onto itself or its own upstream systems. |
+| EXL-04 | Right-clicking any item in the left panel opens a menu with Delete and Duplicate. | Done | Applies to systems, exes, topics, bundles and chains. The menu also offers Rename. For the broker, Duplicate and Delete are disabled. Delete asks for confirmation. Checked in Chrome. |
+| EXL-05 | Double-clicking any item in the left panel lets the user rename it in place. | Done | Enter or clicking away saves, Escape cancels. Also works for the broker. Checked in Chrome. |
+| EXL-06 | Duplicates are placed directly after the original. | Done (tested) | What is copied is described in §7, decision 10. |
+| EXL-07 | The user can rearrange topics in the Topics section by drag and drop. | Done (tested) | Drop on the top or bottom half of a row. There is no separate "manual" mode: the list always shows the user's order. Checked in Chrome. |
+| EXL-08 | One button in the Topics header sorts the list A–Z or Z–A and shows the current order. | Done (tested) | The button shows ↑ (A–Z), ↓ (Z–A) or ↕ (custom order, for example after a drag). Clicking sorts A–Z, or Z–A when the list is already A–Z. Sorting uses natural, case-insensitive order, so TOPIC 2 comes before TOPIC 10. The sorted result becomes the order the user can then drag. Checked in Chrome. |
+
+### 4.8 Details pane
 
 | ID | Requirement | Status | Notes |
 |---|---|---|---|
@@ -132,7 +148,7 @@ The built-in sample model (toolbar button **Sample**) recreates ALL.png.
 | DET-04 | Clicking the broker or a group opens its details. | Done | |
 | DET-05 | A single click opens details without changing the view. | Done | **Design decision**: click opens details, double-click focuses the view. |
 
-### 4.8 Export and persistence
+### 4.9 Export and persistence
 
 | ID | Requirement | Status | Notes |
 |---|---|---|---|
@@ -180,16 +196,29 @@ The original request did not settle these points. They were decided during the i
 5. **The exes shown with a single system** are the exes attached directly to the broker that share a topic with it, plus any exes in that system's own upstream subtree.
 6. **The on-screen style is clean, not hand-drawn.** The hand-drawn style is only an option of the draw.io export.
 7. **Technology:** Vite, React and TypeScript, with Zustand and Immer for state. Rendering is SVG from a custom layout engine.
+8. **An endpoint belongs to at most one functional chain**, just as a topic belongs to at most one bundle. This keeps the "collapse by chain" view unambiguous.
+9. **A group's type cannot be changed after creation.** Bundle members are topics and chain members are endpoints, so membership cannot be carried over from one type to the other.
+10. **What Duplicate copies:**
+    - **System or exe:** its fields and its produced and consumed topics, including their chain membership. Its upstream systems are not copied.
+    - **Topic:** its fields, its bundle, and its producers and consumers. The copied endpoints are not put in any chain.
+    - **Bundle or chain:** its name, colour and description only. It has no members, because a topic is in at most one bundle and an endpoint is in at most one chain.
+11. **The order of systems is the order of the model's system list.** Dragging a system in the left panel changes that order, and the canvas follows it.
+12. **The topic order only affects lists, not the canvas.** On the canvas, tabs are still ordered to reduce crossing arrows (LAY-04). The order is saved in the model file. The sort indicator is worked out from the list itself and is not stored, so it always matches what is shown. Sorting is a one-off action: new or renamed topics are not re-sorted automatically.
 
 ## 8. Open questions
 
-- Should users be able to fix the order of systems along a border, or drag systems to reorder them (LAY-07)?
 - Is a separate "both directions" role needed in the editor, or are two interactions enough?
 - Should topics carry more structured fields, such as schema, retention, partitions or SLA, instead of free-form properties?
 - Is a shared, server-side model needed so that several people can edit the same diagram?
+- Should an endpoint be allowed to belong to several functional chains at once? If so, how should "collapse by chain" show it?
+- Should a chain record the order of its steps, for example to number the arrows along the flow?
 
 ## 9. Change log
 
 | Date | Version | Change |
 |---|---|---|
-| 2026-11-07 | 0.1 | Initial build covering §4.1–4.8. Reference material moved to `docs/spec/`. |
+| 2026-11-07 | 0.1 | Initial build covering §4.1–4.6 and §4.8–4.9. Reference material moved to `docs/spec/`. |
+| 2026-11-07 | 0.5 | Topics section: the A–Z/Manual switch is replaced by drag and drop plus one A–Z/Z–A sort button (EXL-07, EXL-08). Removed EXL-09: details pane lists follow the topic order without needing a separate rule. |
+| 2026-11-07 | 0.4 | Topics section: A–Z or Manual order, with drag-and-drop reordering (EXL-07 to EXL-09). |
+| 2026-11-07 | 0.3 | Left panel: drag and drop systems to reorder them, move them to another border or make them upstream (EXL-01 to EXL-03, LAY-07 done). Right-click menu with Rename, Duplicate and Delete (EXL-04). Double-click to rename (EXL-05). |
+| 2026-11-07 | 0.2 | Functional chains now group individual endpoints instead of whole topics (GRP-02 to GRP-07). Arrows are computed per endpoint, so collapsed chain tabs connect to plain topic tabs. |

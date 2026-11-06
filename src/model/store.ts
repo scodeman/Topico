@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { immer } from 'zustand/middleware/immer';
 import type { CollapseBy } from '../engine/view';
+import { duplicateGroup, duplicateSystem, duplicateTopic, moveSystem, moveTopic, sortTopics, type MoveTarget, type SortDir } from './ops';
 import { sampleModel } from './sample';
 import {
   CENTRE_ID,
@@ -49,6 +50,14 @@ interface Store {
   addSystem(init?: { kind?: NodeKind; side?: Side; parentId?: string | null }): string;
   updateSystem(id: string, patch: Partial<SystemNode>): void;
   deleteSystem(id: string): void;
+  /** Drag & drop in the explorer: change border, parent and/or position (the canvas follows). */
+  moveSystem(id: string, target: MoveTarget): void;
+  duplicateSystem(id: string): void;
+  duplicateTopic(id: string): void;
+  duplicateGroup(id: string): void;
+  /** Drag & drop of topics in the explorer. */
+  moveTopic(id: string, target: { kind: 'before' | 'after'; refId: string }): void;
+  sortTopics(dir: SortDir): void;
   addTopic(name?: string): string;
   updateTopic(id: string, patch: Partial<Topic>): void;
   deleteTopic(id: string): void;
@@ -58,7 +67,8 @@ interface Store {
   addGroup(type: GroupType): string;
   updateGroup(id: string, patch: Partial<Group>): void;
   deleteGroup(id: string): void;
-  setGroupMembers(groupId: string, topicIds: string[]): void;
+  /** Bundle: topic ids. Chain: interaction (endpoint) ids. */
+  setGroupMembers(groupId: string, memberIds: string[]): void;
   setFocus(f: Focus): void;
   /** Toggle an element in the filter. `additive` keeps the current filter (shift-click). */
   filterOn(kind: 'system' | 'topic', id: string, additive: boolean): void;
@@ -135,6 +145,25 @@ export const useStore = create<Store>()(
           s.ui.focus = null;
         }),
 
+      moveSystem: (id, target) => set((s) => void moveSystem(s.model, id, target)),
+      duplicateSystem: (id) =>
+        set((s) => {
+          const copy = duplicateSystem(s.model, id);
+          if (copy) s.ui.focus = { kind: 'system', id: copy };
+        }),
+      duplicateTopic: (id) =>
+        set((s) => {
+          const copy = duplicateTopic(s.model, id);
+          if (copy) s.ui.focus = { kind: 'topic', id: copy };
+        }),
+      moveTopic: (id, target) => set((s) => void moveTopic(s.model, id, target)),
+      sortTopics: (dir) => set((s) => void sortTopics(s.model, dir)),
+      duplicateGroup: (id) =>
+        set((s) => {
+          const copy = duplicateGroup(s.model, id);
+          if (copy) s.ui.focus = { kind: 'group', id: copy };
+        }),
+
       addTopic: (name) => {
         const id = newId('t');
         set((s) => {
@@ -146,7 +175,6 @@ export const useStore = create<Store>()(
             format: '',
             properties: [],
             bundleId: null,
-            chainId: null,
             hidden: false,
           });
         });
@@ -164,7 +192,7 @@ export const useStore = create<Store>()(
       addInteraction: (systemId, topicId, direction) =>
         set((s) => {
           const exists = s.model.interactions.some((i) => i.systemId === systemId && i.topicId === topicId && i.direction === direction);
-          if (!exists) s.model.interactions.push({ id: newId('i'), systemId, topicId, direction, hidden: false });
+          if (!exists) s.model.interactions.push({ id: newId('i'), systemId, topicId, direction, hidden: false, chainId: null });
         }),
       updateInteraction: (id, patch) => set((s) => void Object.assign(s.model.interactions.find((x) => x.id === id) ?? {}, patch)),
       deleteInteraction: (id) => set((s) => void (s.model.interactions = s.model.interactions.filter((x) => x.id !== id))),
@@ -188,35 +216,31 @@ export const useStore = create<Store>()(
         set((s) => {
           const g = s.model.groups.find((x) => x.id === id);
           if (!g) return;
-          if (patch.type && patch.type !== g.type) {
-            for (const t of s.model.topics) {
-              const wasMember = g.type === 'bundle' ? t.bundleId === id : t.chainId === id;
-              if (!wasMember) continue;
-              if (g.type === 'bundle') t.bundleId = null;
-              else t.chainId = null;
-              if (patch.type === 'bundle') t.bundleId = id;
-              else t.chainId = id;
-            }
-          }
-          Object.assign(g, patch);
+          // The type is fixed: bundle members are topics, chain members are endpoints.
+          Object.assign(g, { ...patch, type: g.type });
         }),
       deleteGroup: (id) =>
         set((s) => {
           s.model.groups = s.model.groups.filter((g) => g.id !== id);
-          for (const t of s.model.topics) {
-            if (t.bundleId === id) t.bundleId = null;
-            if (t.chainId === id) t.chainId = null;
-          }
+          for (const t of s.model.topics) if (t.bundleId === id) t.bundleId = null;
+          for (const i of s.model.interactions) if (i.chainId === id) i.chainId = null;
+          s.ui.filterTopics = s.ui.filterTopics.filter((x) => x !== `grp:${id}`);
           s.ui.focus = null;
         }),
-      setGroupMembers: (groupId, topicIds) =>
+      setGroupMembers: (groupId, memberIds) =>
         set((s) => {
           const g = s.model.groups.find((x) => x.id === groupId);
           if (!g) return;
-          const key = g.type === 'bundle' ? 'bundleId' : 'chainId';
-          for (const t of s.model.topics) {
-            if (topicIds.includes(t.id)) t[key] = groupId;
-            else if (t[key] === groupId) t[key] = null;
+          if (g.type === 'bundle') {
+            for (const t of s.model.topics) {
+              if (memberIds.includes(t.id)) t.bundleId = groupId;
+              else if (t.bundleId === groupId) t.bundleId = null;
+            }
+          } else {
+            for (const i of s.model.interactions) {
+              if (memberIds.includes(i.id)) i.chainId = groupId;
+              else if (i.chainId === groupId) i.chainId = null;
+            }
           }
         }),
 
@@ -249,7 +273,8 @@ export const useStore = create<Store>()(
       partialize: (s) => ({ model: s.model, ui: { ...s.ui, hoverTopic: null } }),
       merge: (persisted, current) => {
         const p = persisted as Partial<Store> | undefined;
-        return { ...current, model: p?.model ? normalizeModel(p.model) : current.model, ui: { ...initialUi, ...(p?.ui ?? {}) } };
+        const { topicSort: _dropped, ...ui } = (p?.ui ?? {}) as Partial<UiState> & { topicSort?: unknown };
+        return { ...current, model: p?.model ? normalizeModel(p.model) : current.model, ui: { ...initialUi, ...ui } };
       },
     },
   ),

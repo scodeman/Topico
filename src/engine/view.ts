@@ -2,6 +2,7 @@ import {
   CENTRE_ID,
   descendants,
   effectiveSide,
+  type Direction,
   type GroupType,
   type Interaction,
   type Model,
@@ -14,7 +15,10 @@ export type CollapseBy = 'none' | GroupType;
 export interface ViewOptions {
   /** System ids used as filter. Empty, or containing the centre, means "show all". */
   filterSystems: string[];
-  /** View-topic ids (topic ids, or `grp:<groupId>` when collapsed) used as filter. */
+  /**
+   * Topic ids and/or group ids (`grp:<groupId>`) used as filter.
+   * A bundle matches every endpoint of its topics; a chain matches only its own endpoints.
+   */
   filterTopics: string[];
   collapseBy: CollapseBy;
   /** With several systems selected, keep only topics exchanged between them. */
@@ -23,20 +27,32 @@ export interface ViewOptions {
 
 export type Role = 'produce' | 'consume' | 'both';
 
+/** What a tab stands for: a single topic, or a collapsed bundle/chain. */
 export interface ViewTopic {
   id: string;
   name: string;
-  /** Model topic ids represented by this view topic (more than one when collapsed into a group). */
+  /** Model topic ids represented by this tab. */
   sourceIds: string[];
   isGroup: boolean;
+  /** Bundle of the topic (or the bundle itself when collapsed). */
   bundleId: string | null;
-  chainId: string | null;
 }
 
 export interface ViewTab {
+  /** View-topic id: a topic id, or `grp:<groupId>` when collapsed. */
   topicId: string;
   role: Role;
   interactionIds: string[];
+  /** Functional chains of the endpoints shown by this tab. */
+  chainIds: string[];
+}
+
+/** One endpoint of a node: a (topic, direction) pair and the tab that displays it. */
+interface Flow {
+  topicId: string;
+  direction: Direction;
+  tabId: string;
+  chainId: string | null;
 }
 
 export interface ViewNode {
@@ -48,25 +64,30 @@ export interface ViewNode {
   parentId: string;
   children: string[];
   tabs: ViewTab[];
+  flows: Flow[];
 }
 
 export interface Endpoint {
   nodeId: string;
   /** 'inner' = the node's tab seen from its parent container; 'outer' = the same tab seen from inside the node. */
   end: 'inner' | 'outer';
+  /** View-topic id of the tab the arrow attaches to. */
+  tabId: string;
 }
 
 export interface ViewEdge {
   id: string;
   container: string;
-  topicId: string;
+  /** Model topics carried by this arrow. */
+  topicIds: string[];
   from: Endpoint;
   to: Endpoint;
+  /** Set when both ends of every carried flow belong to the same functional chain. */
+  chainId: string | null;
 }
 
 export interface ViewStub {
   id: string;
-  topicId: string;
   at: Endpoint;
   /** true = flow leaves the visible endpoint towards something filtered out. */
   outgoing: boolean;
@@ -84,17 +105,10 @@ export interface ViewModel {
 
 export const groupTopicId = (groupId: string) => `grp:${groupId}`;
 
-function mergeRole(a: Role | undefined, b: Role): Role {
-  if (!a || a === b) return b;
-  return 'both';
-}
+const mergeRole = (a: Role, b: Role): Role => (a === b ? a : 'both');
 
-interface Graph {
-  nodes: Record<string, ViewNode>;
-}
-
-/** Build view nodes (with tabs) for the given systems and interactions. */
-function buildNodes(model: Model, systemIds: Set<string>, interactions: Interaction[], topicMap: (id: string) => string): Graph {
+/** Build view nodes (with tabs and flows) for the given systems and interactions. */
+function buildNodes(model: Model, systemIds: Set<string>, interactions: Interaction[], tabOf: (i: Interaction) => string) {
   const nodes: Record<string, ViewNode> = {};
   for (const s of model.systems) {
     if (!systemIds.has(s.id)) continue;
@@ -107,70 +121,108 @@ function buildNodes(model: Model, systemIds: Set<string>, interactions: Interact
       parentId: parentOk ? s.parentId! : CENTRE_ID,
       children: [],
       tabs: [],
+      flows: [],
     };
   }
   for (const s of model.systems) {
     const n = nodes[s.id];
     if (n && n.parentId !== CENTRE_ID) nodes[n.parentId].children.push(n.id);
   }
-  const tabIndex = new Map<string, ViewTab>();
   for (const i of interactions) {
     const n = nodes[i.systemId];
     if (!n) continue;
-    const tid = topicMap(i.topicId);
-    const key = `${n.id}|${tid}`;
-    let tab = tabIndex.get(key);
+    const tabId = tabOf(i);
+    n.flows.push({ topicId: i.topicId, direction: i.direction, tabId, chainId: i.chainId });
+    let tab = n.tabs.find((t) => t.topicId === tabId);
     if (!tab) {
-      tab = { topicId: tid, role: i.direction, interactionIds: [] };
-      tabIndex.set(key, tab);
+      tab = { topicId: tabId, role: i.direction, interactionIds: [], chainIds: [] };
       n.tabs.push(tab);
     } else {
       tab.role = mergeRole(tab.role, i.direction);
     }
     tab.interactionIds.push(i.id);
+    if (i.chainId && !tab.chainIds.includes(i.chainId)) tab.chainIds.push(i.chainId);
   }
-  return { nodes };
+  return nodes;
 }
 
-/** Pair producers with consumers inside every container (centre and each system). */
-export function computeEdges(nodes: Record<string, ViewNode>): ViewEdge[] {
-  const edges: ViewEdge[] = [];
+interface FlowEdge {
+  /** Identity of the underlying flow, independent of how tabs are grouped. */
+  key: string;
+  container: string;
+  topicId: string;
+  from: Endpoint;
+  to: Endpoint;
+  chainId: string | null;
+}
+
+/** Pair producers with consumers of each topic inside every container (centre and each system). */
+function flowEdges(nodes: Record<string, ViewNode>): FlowEdge[] {
+  const out: FlowEdge[] = [];
   const containers: { id: string; children: ViewNode[]; self?: ViewNode }[] = [
     { id: CENTRE_ID, children: Object.values(nodes).filter((n) => n.parentId === CENTRE_ID) },
     ...Object.values(nodes).map((n) => ({ id: n.id, self: n, children: n.children.map((c) => nodes[c]) })),
   ];
+  type Ep = Endpoint & { chainId: string | null };
   for (const c of containers) {
-    const producers = new Map<string, Endpoint[]>();
-    const consumers = new Map<string, Endpoint[]>();
-    const add = (m: Map<string, Endpoint[]>, t: string, e: Endpoint) => {
+    const producers = new Map<string, Ep[]>();
+    const consumers = new Map<string, Ep[]>();
+    const add = (m: Map<string, Ep[]>, t: string, e: Ep) => {
       if (!m.has(t)) m.set(t, []);
       m.get(t)!.push(e);
     };
     for (const ch of c.children) {
-      for (const tab of ch.tabs) {
-        const e: Endpoint = { nodeId: ch.id, end: 'inner' };
-        if (tab.role !== 'consume') add(producers, tab.topicId, e);
-        if (tab.role !== 'produce') add(consumers, tab.topicId, e);
+      for (const f of ch.flows) {
+        const e: Ep = { nodeId: ch.id, end: 'inner', tabId: f.tabId, chainId: f.chainId };
+        add(f.direction === 'produce' ? producers : consumers, f.topicId, e);
       }
     }
     if (c.self && c.children.length) {
       // Inside a system, its own tab acts in reverse: what it consumes from its parent it relays to its children.
-      for (const tab of c.self.tabs) {
-        const e: Endpoint = { nodeId: c.self.id, end: 'outer' };
-        if (tab.role !== 'produce') add(producers, tab.topicId, e);
-        if (tab.role !== 'consume') add(consumers, tab.topicId, e);
+      for (const f of c.self.flows) {
+        const e: Ep = { nodeId: c.self.id, end: 'outer', tabId: f.tabId, chainId: f.chainId };
+        add(f.direction === 'consume' ? producers : consumers, f.topicId, e);
       }
     }
     for (const [topicId, ps] of producers) {
       for (const p of ps) {
         for (const q of consumers.get(topicId) ?? []) {
           if (p.nodeId === q.nodeId) continue;
-          edges.push({ id: `${c.id}|${topicId}|${p.nodeId}.${p.end}>${q.nodeId}.${q.end}`, container: c.id, topicId, from: p, to: q });
+          out.push({
+            key: `${c.id}|${topicId}|${p.nodeId}.${p.end}>${q.nodeId}.${q.end}`,
+            container: c.id,
+            topicId,
+            from: { nodeId: p.nodeId, end: p.end, tabId: p.tabId },
+            to: { nodeId: q.nodeId, end: q.end, tabId: q.tabId },
+            chainId: p.chainId && p.chainId === q.chainId ? p.chainId : null,
+          });
         }
       }
     }
   }
-  return edges;
+  return out;
+}
+
+const endpointKey = (e: Endpoint) => `${e.nodeId}.${e.end}.${e.tabId}`;
+
+/** Merge flows that land on the same pair of tabs into one arrow. */
+function mergeEdges(flows: FlowEdge[]): ViewEdge[] {
+  const byKey = new Map<string, ViewEdge>();
+  for (const f of flows) {
+    const id = `${f.container}|${endpointKey(f.from)}>${endpointKey(f.to)}`;
+    const e = byKey.get(id);
+    if (!e) byKey.set(id, { id, container: f.container, topicIds: [f.topicId], from: f.from, to: f.to, chainId: f.chainId });
+    else {
+      if (!e.topicIds.includes(f.topicId)) e.topicIds.push(f.topicId);
+      if (e.chainId !== f.chainId) e.chainId = null;
+    }
+  }
+  return [...byKey.values()];
+}
+
+/** Arrows of a set of nodes (exported for tests and tools). */
+export function computeEdges(nodes: Record<string, ViewNode>): ViewEdge[] {
+  return mergeEdges(flowEdges(nodes));
 }
 
 export function computeView(model: Model, opts: ViewOptions): ViewModel {
@@ -179,6 +231,7 @@ export function computeView(model: Model, opts: ViewOptions): ViewModel {
   for (const s of model.systems) if (s.hidden) [s.id, ...descendants(model, s.id)].forEach((id) => hiddenSystems.add(id));
   const hiddenTopics = new Set(model.topics.filter((t) => t.hidden).map((t) => t.id));
   const topicById = new Map(model.topics.map((t) => [t.id, t]));
+  const groupById = new Map(model.groups.map((g) => [g.id, g]));
   const active = model.interactions.filter(
     (i) => !i.hidden && !hiddenSystems.has(i.systemId) && !hiddenTopics.has(i.topicId) && topicById.has(i.topicId),
   );
@@ -195,40 +248,22 @@ export function computeView(model: Model, opts: ViewOptions): ViewModel {
     }
     return out;
   };
-
-  // 2. Grouping: map topics to view topics.
-  const groupById = new Map(model.groups.map((g) => [g.id, g]));
-  const topicMap = (topicId: string): string => {
-    if (opts.collapseBy === 'none') return topicId;
-    const t = topicById.get(topicId);
-    const gid = opts.collapseBy === 'bundle' ? t?.bundleId : t?.chainId;
-    return gid && groupById.has(gid) ? groupTopicId(gid) : topicId;
+  const bundleOf = (i: Interaction) => {
+    const b = topicById.get(i.topicId)?.bundleId;
+    return b && groupById.has(b) ? b : null;
   };
-  const topics: Record<string, ViewTopic> = {};
-  for (const t of model.topics) {
-    if (hiddenTopics.has(t.id)) continue;
-    const vid = topicMap(t.id);
-    if (vid === t.id) {
-      topics[vid] = { id: vid, name: t.name, sourceIds: [t.id], isGroup: false, bundleId: t.bundleId, chainId: t.chainId };
-    } else {
-      const g = groupById.get(vid.slice(4))!;
-      const vt = (topics[vid] ??= {
-        id: vid,
-        name: g.name,
-        sourceIds: [],
-        isGroup: true,
-        bundleId: g.type === 'bundle' ? g.id : null,
-        chainId: g.type === 'chain' ? g.id : null,
-      });
-      vt.sourceIds.push(t.id);
-    }
-  }
-  for (const vt of Object.values(topics)) if (vt.isGroup) vt.name = `${vt.name} (${vt.sourceIds.length})`;
+  const chainOf = (i: Interaction) => (i.chainId && groupById.has(i.chainId) ? i.chainId : null);
+
+  // 2. Grouping: which tab displays each endpoint.
+  const tabOf = (i: Interaction): string => {
+    const gid = opts.collapseBy === 'bundle' ? bundleOf(i) : opts.collapseBy === 'chain' ? chainOf(i) : null;
+    return gid ? groupTopicId(gid) : i.topicId;
+  };
 
   // 3. Selection filter.
   const filterSystems = opts.filterSystems.filter((id) => id !== CENTRE_ID && activeSystems.has(id));
   const centreSelected = opts.filterSystems.includes(CENTRE_ID);
-  const filterTopics = opts.filterTopics.filter((id) => topics[id]);
+  const filterTopics = opts.filterTopics.filter((id) => (id.startsWith('grp:') ? groupById.has(id.slice(4)) : topicById.has(id)));
   let visible: Interaction[] = active;
   let visibleSystems = activeSystems;
   let filtered = false;
@@ -236,11 +271,16 @@ export function computeView(model: Model, opts: ViewOptions): ViewModel {
   if (!centreSelected && filterTopics.length) {
     filtered = true;
     const wanted = new Set(filterTopics);
-    visible = active.filter((i) => wanted.has(topicMap(i.topicId)));
+    const matches = (i: Interaction) => {
+      const b = bundleOf(i);
+      const c = chainOf(i);
+      return wanted.has(i.topicId) || (!!b && wanted.has(groupTopicId(b))) || (!!c && wanted.has(groupTopicId(c)));
+    };
+    visible = active.filter(matches);
     visibleSystems = withAncestors(visible.map((i) => i.systemId));
   } else if (!centreSelected && filterSystems.length) {
     filtered = true;
-    const topicsOf = (sid: string) => new Set(active.filter((i) => i.systemId === sid).map((i) => topicMap(i.topicId)));
+    const topicsOf = (sid: string) => new Set(active.filter((i) => i.systemId === sid).map((i) => i.topicId));
     const perSystem = filterSystems.map(topicsOf);
     let wanted = new Set(perSystem.flatMap((s) => [...s]));
     if (filterSystems.length > 1 && opts.sharedOnly) {
@@ -251,30 +291,35 @@ export function computeView(model: Model, opts: ViewOptions): ViewModel {
     const related = new Set<string>(withAncestors(filterSystems));
     for (const id of filterSystems) descendants(model, id).forEach((d) => related.add(d));
     for (const s of model.systems) if (s.kind === 'exe' && s.parentId === null) related.add(s.id);
-    visible = active.filter((i) => related.has(i.systemId) && wanted.has(topicMap(i.topicId)));
+    visible = active.filter((i) => related.has(i.systemId) && wanted.has(i.topicId));
     visibleSystems = withAncestors([...filterSystems, ...visible.map((i) => i.systemId)]);
   }
 
-  const { nodes } = buildNodes(model, visibleSystems, visible, topicMap);
-  const edges = computeEdges(nodes);
+  const nodes = buildNodes(model, visibleSystems, visible, tabOf);
+  const visibleFlows = flowEdges(nodes);
+  const edges = mergeEdges(visibleFlows);
 
   // 4. Stubs: flows that exist in the full picture but whose other end is filtered out.
   const stubs: ViewStub[] = [];
   if (filtered) {
-    const full = buildNodes(model, activeSystems, active, topicMap).nodes;
-    const visibleEdgeIds = new Set(edges.map((e) => e.id));
-    const hasTab = (e: Endpoint, topicId: string) => !!nodes[e.nodeId]?.tabs.some((t) => t.topicId === topicId);
+    const full = buildNodes(model, activeSystems, active, tabOf);
+    const visibleKeys = new Set(visibleFlows.map((f) => f.key));
+    // A visible endpoint: the node is shown and still has this flow (producer side or consumer side).
+    const visibleEnd = (e: Endpoint, topicId: string, isProducer: boolean) => {
+      const dir: Direction = (e.end === 'inner') === isProducer ? 'produce' : 'consume';
+      return nodes[e.nodeId]?.flows.find((f) => f.topicId === topicId && f.direction === dir);
+    };
     const seen = new Set<string>();
-    for (const e of computeEdges(full)) {
-      if (visibleEdgeIds.has(e.id)) continue;
-      const fromVis = hasTab(e.from, e.topicId);
-      const toVis = hasTab(e.to, e.topicId);
-      if (fromVis === toVis) continue;
-      const at = fromVis ? e.from : e.to;
-      const id = `stub|${at.nodeId}.${at.end}|${e.topicId}|${fromVis ? 'out' : 'in'}`;
+    for (const f of flowEdges(full)) {
+      if (visibleKeys.has(f.key)) continue;
+      const fromVis = visibleEnd(f.from, f.topicId, true);
+      const toVis = visibleEnd(f.to, f.topicId, false);
+      if (!!fromVis === !!toVis) continue;
+      const at = fromVis ? f.from : f.to;
+      const id = `stub|${endpointKey(at)}|${fromVis ? 'out' : 'in'}`;
       if (seen.has(id)) continue;
       seen.add(id);
-      stubs.push({ id, topicId: e.topicId, at, outgoing: fromVis });
+      stubs.push({ id, at, outgoing: !!fromVis });
     }
   }
 
@@ -284,8 +329,26 @@ export function computeView(model: Model, opts: ViewOptions): ViewModel {
     if (n && n.parentId === CENTRE_ID) roots[n.side].push(n.id);
   }
 
-  const usedTopics = new Set(Object.values(nodes).flatMap((n) => n.tabs.map((t) => t.topicId)));
-  for (const id of Object.keys(topics)) if (!usedTopics.has(id) && filtered) delete topics[id];
+  // 5. Describe every tab that is drawn.
+  const topics: Record<string, ViewTopic> = {};
+  for (const n of Object.values(nodes)) {
+    for (const f of n.flows) {
+      let vt = topics[f.tabId];
+      if (!vt) {
+        if (f.tabId.startsWith('grp:')) {
+          const g = groupById.get(f.tabId.slice(4))!;
+          vt = { id: f.tabId, name: g.name, sourceIds: [], isGroup: true, bundleId: g.type === 'bundle' ? g.id : null };
+        } else {
+          const t = topicById.get(f.topicId)!;
+          vt = { id: t.id, name: t.name, sourceIds: [], isGroup: false, bundleId: t.bundleId && groupById.has(t.bundleId) ? t.bundleId : null };
+        }
+        topics[f.tabId] = vt;
+      }
+      if (!vt.sourceIds.includes(f.topicId)) vt.sourceIds.push(f.topicId);
+    }
+  }
+  // Bundles show how many topics they hold. Chains don't: their tabs hold different endpoints on each system.
+  for (const vt of Object.values(topics)) if (vt.isGroup && vt.bundleId) vt.name = `${vt.name} (${vt.sourceIds.length})`;
 
   return { centreName: model.centre.name, nodes, roots, topics, edges, stubs, filtered };
 }

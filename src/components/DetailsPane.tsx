@@ -134,7 +134,10 @@ function InteractionTopic({ interaction: i }: { interaction: Interaction }) {
   return (
     <details className={`topic-card${i.hidden ? ' is-hidden' : ''}`}>
       <summary>
-        <span>{topic.name}</span>
+        <span>
+          {topic.name}
+          <ChainDot chainId={i.chainId} />
+        </span>
         <span className="summary-actions" onClick={(e) => e.preventDefault()}>
           <label title="Hide this interaction">
             <input type="checkbox" checked={i.hidden} onChange={(e) => st().updateInteraction(i.id, { hidden: e.target.checked })} /> hide
@@ -143,6 +146,9 @@ function InteractionTopic({ interaction: i }: { interaction: Interaction }) {
           <button className="link danger" onClick={() => st().deleteInteraction(i.id)} title="Remove interaction">remove</button>
         </span>
       </summary>
+      <div className="endpoint-fields">
+        <ChainSelect interaction={i} label="Functional chain (this endpoint)" />
+      </div>
       <TopicFields id={topic.id} />
     </details>
   );
@@ -204,6 +210,7 @@ function TopicPane({ id }: { id: string }) {
             .map((i) => (
               <div key={i.id} className={`link-row${i.hidden ? ' is-hidden' : ''}`}>
                 <button className="link" onClick={() => st().setFocus({ kind: 'system', id: i.systemId })}>{sysName(i.systemId)}</button>
+                <ChainSelect interaction={i} compact />
                 <label title="Hide this interaction">
                   <input type="checkbox" checked={i.hidden} onChange={(e) => st().updateInteraction(i.id, { hidden: e.target.checked })} /> hide
                 </label>
@@ -236,7 +243,7 @@ function TopicFields({ id }: { id: string }) {
   const st = useStore.getState;
   if (!topic) return null;
   const up = (patch: Parameters<ReturnType<typeof st>['updateTopic']>[1]) => st().updateTopic(id, patch);
-  const opts = (type: 'bundle' | 'chain') => [['', '— none —'], ...groups.filter((g) => g.type === type).map((g) => [g.id, g.name] as [string, string])] as [string, string][];
+  const bundles: [string, string][] = [['', '— none —'], ...groups.filter((g) => g.type === 'bundle').map((g) => [g.id, g.name] as [string, string])];
   return (
     <div className="topic-fields">
       <Text label="Name" value={topic.name} onChange={(name) => up({ name })} />
@@ -244,10 +251,7 @@ function TopicFields({ id }: { id: string }) {
         <Text label="Format" value={topic.format} onChange={(format) => up({ format })} placeholder="Avro, JSON…" />
         <Text label="Owner" value={topic.owner} onChange={(owner) => up({ owner })} />
       </div>
-      <div className="row2">
-        <Select label="Bundle" value={topic.bundleId ?? ''} options={opts('bundle')} onChange={(v) => up({ bundleId: v || null })} />
-        <Select label="Functional chain" value={topic.chainId ?? ''} options={opts('chain')} onChange={(v) => up({ chainId: v || null })} />
-      </div>
+      <Select label="Bundle (whole topic)" value={topic.bundleId ?? ''} options={bundles} onChange={(v) => up({ bundleId: v || null })} />
       <Text label="Description" value={topic.description} onChange={(description) => up({ description })} multiline />
       <Properties value={topic.properties} onChange={(properties) => up({ properties })} />
       <label className="check">
@@ -262,38 +266,120 @@ function GroupPane({ id }: { id: string }) {
   const st = useStore.getState;
   const g = model.groups.find((x) => x.id === id);
   if (!g) return <p className="muted">This group no longer exists.</p>;
-  const key = g.type === 'bundle' ? 'bundleId' : 'chainId';
-  const members = model.topics.filter((t) => t[key] === id).map((t) => t.id);
+  const isBundle = g.type === 'bundle';
   return (
     <div>
-      <h3 className="pane-kind">{g.type === 'bundle' ? 'Bundle' : 'Functional chain'}</h3>
-      <Text label="Name" value={g.name} onChange={(name) => st().updateGroup(id, { name })} />
+      <h3 className="pane-kind">{isBundle ? 'Bundle' : 'Functional chain'}</h3>
+      <p className="muted small">
+        {isBundle
+          ? 'A bundle groups whole topics, wherever they are produced or consumed.'
+          : 'A functional chain groups individual endpoints: pick which systems producing or consuming a topic take part in it.'}
+      </p>
       <div className="row2">
-        <Select label="Type" value={g.type} options={[['bundle', 'Bundle'], ['chain', 'Functional chain']]} onChange={(type) => st().updateGroup(id, { type: type as 'bundle' | 'chain' })} />
+        <Text label="Name" value={g.name} onChange={(name) => st().updateGroup(id, { name })} />
         <label className="field">
           <span>Colour</span>
           <input type="color" value={g.color} onChange={(e) => st().updateGroup(id, { color: e.target.value })} />
         </label>
       </div>
       <Text label="Description" value={g.description} onChange={(description) => st().updateGroup(id, { description })} multiline />
-      <section className="subsection">
-        <h4>Topics ({members.length})</h4>
-        <div className="member-list">
-          {model.topics.map((t) => (
-            <label key={t.id} className="check">
-              <input
-                type="checkbox"
-                checked={members.includes(t.id)}
-                onChange={(e) => st().setGroupMembers(id, e.target.checked ? [...members, t.id] : members.filter((m) => m !== t.id))}
-              />
-              {t.name}
-              {t[key] && t[key] !== id && <span className="muted small"> (in {model.groups.find((x) => x.id === t[key])?.name})</span>}
-            </label>
-          ))}
-        </div>
-      </section>
+      <div className="btn-row">
+        <button onClick={() => st().filterOn('topic', `grp:${id}`, false)}>Focus view</button>
+      </div>
+      {isBundle ? <BundleMembers groupId={id} /> : <ChainMembers groupId={id} />}
       <button className="danger" onClick={() => confirm(`Delete ${g.name}?`) && st().deleteGroup(id)}>Delete group</button>
     </div>
+  );
+}
+
+function BundleMembers({ groupId }: { groupId: string }) {
+  const model = useStore((s) => s.model);
+  const st = useStore.getState;
+  const members = model.topics.filter((t) => t.bundleId === groupId).map((t) => t.id);
+  return (
+    <section className="subsection">
+      <h4>Topics ({members.length})</h4>
+      <div className="member-list">
+        {model.topics.map((t) => (
+          <label key={t.id} className="check">
+            <input
+              type="checkbox"
+              checked={members.includes(t.id)}
+              onChange={(e) => st().setGroupMembers(groupId, e.target.checked ? [...members, t.id] : members.filter((m) => m !== t.id))}
+            />
+            {t.name}
+            {t.bundleId && t.bundleId !== groupId && <span className="muted small"> (in {model.groups.find((x) => x.id === t.bundleId)?.name})</span>}
+          </label>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function ChainMembers({ groupId }: { groupId: string }) {
+  const model = useStore((s) => s.model);
+  const st = useStore.getState;
+  const [showAll, setShowAll] = useState(false);
+  const members = model.interactions.filter((i) => i.chainId === groupId).map((i) => i.id);
+  const sysName = (sid: string) => model.systems.find((s) => s.id === sid)?.name ?? sid;
+  const set = (iid: string, on: boolean) => st().setGroupMembers(groupId, on ? [...members, iid] : members.filter((m) => m !== iid));
+  const topics = model.topics.filter((t) => showAll || model.interactions.some((i) => i.topicId === t.id && i.chainId === groupId));
+  return (
+    <section className="subsection">
+      <h4>Endpoints ({members.length})</h4>
+      <label className="check small">
+        <input type="checkbox" checked={showAll} onChange={(e) => setShowAll(e.target.checked)} /> Show all topics to pick endpoints
+      </label>
+      {topics.length === 0 && <p className="muted small">No endpoints yet. Tick the box above, or pick this chain on an endpoint from a system or topic pane.</p>}
+      {topics.map((t) => {
+        const eps = model.interactions.filter((i) => i.topicId === t.id);
+        if (!eps.length) return null;
+        return (
+          <div key={t.id} className="chain-topic">
+            <div className="chain-topic-name">{t.name}</div>
+            {eps.map((i) => (
+              <label key={i.id} className="check">
+                <input type="checkbox" checked={i.chainId === groupId} onChange={(e) => set(i.id, e.target.checked)} />
+                {sysName(i.systemId)} <span className="muted">{i.direction === 'produce' ? 'produces' : 'consumes'}</span>
+                {i.chainId && i.chainId !== groupId && <span className="muted small"> (in {model.groups.find((x) => x.id === i.chainId)?.name})</span>}
+              </label>
+            ))}
+          </div>
+        );
+      })}
+    </section>
+  );
+}
+
+function ChainDot({ chainId }: { chainId: string | null }) {
+  const g = useStore((s) => s.model.groups.find((x) => x.id === chainId));
+  if (!g) return null;
+  return <span className="dot inline" style={{ background: g.color }} title={`Chain: ${g.name}`} />;
+}
+
+/** Pick the functional chain of one endpoint (interaction). */
+function ChainSelect({ interaction: i, label, compact }: { interaction: Interaction; label?: string; compact?: boolean }) {
+  const groups = useStore((s) => s.model.groups);
+  const chains = groups.filter((g) => g.type === 'chain');
+  const st = useStore.getState;
+  const select = (
+    <select
+      value={i.chainId ?? ''}
+      title="Functional chain of this endpoint"
+      onChange={(e) => st().updateInteraction(i.id, { chainId: e.target.value || null })}
+    >
+      <option value="">{compact ? 'no chain' : '— none —'}</option>
+      {chains.map((g) => (
+        <option key={g.id} value={g.id}>{g.name}</option>
+      ))}
+    </select>
+  );
+  if (compact) return <span className="chain-select-compact">{select}</span>;
+  return (
+    <label className="field">
+      <span>{label}</span>
+      {select}
+    </label>
   );
 }
 

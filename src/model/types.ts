@@ -40,8 +40,8 @@ export interface Topic {
   owner: string;
   format: string;
   properties: Property[];
+  /** A bundle groups the whole topic, wherever it is produced or consumed. */
   bundleId: string | null;
-  chainId: string | null;
   hidden: boolean;
 }
 
@@ -51,6 +51,8 @@ export interface Interaction {
   topicId: string;
   direction: Direction;
   hidden: boolean;
+  /** A functional chain groups individual endpoints (this system producing/consuming this topic), not whole topics. */
+  chainId: string | null;
 }
 
 export interface Group {
@@ -92,19 +94,23 @@ export function normalizeModel(raw: unknown): Model {
   const m = (raw ?? {}) as {
     centre?: Partial<Centre>;
     systems?: Partial<SystemNode>[];
-    topics?: Partial<Topic>[];
+    topics?: (Partial<Topic> & { chainId?: string | null })[];
     interactions?: Partial<Interaction>[];
     groups?: Partial<Group>[];
   };
   const base = emptyModel();
   const sysDefaults: Omit<SystemNode, 'id' | 'name'> = { kind: 'system', side: 'W', parentId: null, description: '', owner: '', properties: [], hidden: false };
-  const topicDefaults: Omit<Topic, 'id' | 'name'> = { description: '', owner: '', format: '', properties: [], bundleId: null, chainId: null, hidden: false };
+  const topicDefaults: Omit<Topic, 'id' | 'name'> = { description: '', owner: '', format: '', properties: [], bundleId: null, hidden: false };
+  // Older files stored the chain on the topic: move it onto each of the topic's endpoints.
+  const legacyChain = new Map((m.topics ?? []).filter((t) => t.id && t.chainId).map((t) => [t.id!, t.chainId!]));
   return {
     version: 1,
     centre: { ...base.centre, ...(m.centre ?? {}), id: 'centre' },
     systems: (m.systems ?? []).map((s) => ({ ...sysDefaults, ...s }) as SystemNode),
-    topics: (m.topics ?? []).map((t) => ({ ...topicDefaults, ...t }) as Topic),
-    interactions: (m.interactions ?? []).map((i) => ({ hidden: false, ...i }) as Interaction),
+    topics: (m.topics ?? []).map(({ chainId: _legacy, ...t }) => ({ ...topicDefaults, ...t }) as Topic),
+    interactions: (m.interactions ?? []).map(
+      (i) => ({ hidden: false, chainId: (i.topicId && legacyChain.get(i.topicId)) || null, ...i }) as Interaction,
+    ),
     groups: (m.groups ?? []).map((g) => ({ description: '', color: '#6366f1', ...g }) as Group),
   };
 }
