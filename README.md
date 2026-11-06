@@ -1,0 +1,52 @@
+# Topico
+
+Diagram topic producers and consumers around a central brokering system.
+
+Requirements, their status and the design decisions are tracked in [docs/spec/SPEC.md](docs/spec/SPEC.md). The reference sketches are in [docs/spec/images](docs/spec/images).
+
+```bash
+npm install
+npm run dev        # http://localhost:5173
+npm test           # engine tests (filtering, grouping, layout overlap)
+npm run build
+```
+
+## Model
+
+| Element | Notes |
+|---|---|
+| **Centre** | The broker. Always drawn in the middle. |
+| **System** / **Exe** | Attached to a centre border (West, North, East, South), or *upstream* of another system, in which case it sits on that system's outer border in the same direction. |
+| **Topic** | Drawn as a tab on the border between a system and its parent. |
+| **Interaction** | A system *produces* or *consumes* a topic. The direction is always relative to the system's parent (the broker, or the upstream system it hangs off). |
+| **Bundle** / **Functional chain** | Named, coloured groups of topics. A bundle is drawn as an outline around adjacent tabs. A chain colours the tabs and arrows. |
+
+Arrows are derived automatically. Inside each container (the broker or a system), every producer of a topic points to every consumer of that topic. A system relays a topic to its upstream systems: what it consumes from the broker it passes to its children, and the reverse.
+
+The model is saved automatically in the browser (localStorage). Use **Save JSON** and **Open…** to keep files.
+
+## Using the views
+
+- **Click** a system, topic or the broker to edit it in the right pane. The system pane lists its produced and consumed topics, each with editable details.
+- **Double-click** a system or topic to focus the view on it. **Shift+double-click** adds more. You can also use the checkboxes in the left panel.
+  - One system: its topics, its upstream leaves and the executables on the broker it exchanges with.
+  - Several systems: only the topics they exchange (turn off *Shared topics only* to see all of their topics).
+  - Topics: only the systems that produce or consume them.
+  - The broker, or **Show all**: everything.
+- Dashed arrows (*Off-view flows*) show that a topic also flows to or from systems outside the current focus.
+- ● / ◌ hides or shows a system (with its upstream systems) or a topic. Single interactions can be hidden from the system or topic pane.
+- **Group topics** collapses topics into one tab per bundle or per functional chain.
+- The layout is recomputed on every change. It sizes boxes to their content, reorders tabs to reduce crossings and keeps bundle members together, and it never lets boxes overlap.
+
+## Export
+
+- **SVG**: the current view, as a standalone file.
+- **draw.io**: an mxGraph `.drawio` file of the current view, which opens in diagrams.net or the draw.io desktop app. Tick *sketch style* to get the hand-drawn look.
+
+## Code map
+
+- `src/model`: types, sample data (based on `docs/spec/images/ALL.png`) and the Zustand store.
+- `src/engine/view.ts`: hiding, filtering, grouping, logical arrows and off-view stubs.
+- `src/engine/layout.ts`: geometry. It places nodes recursively per border and reorders tabs with a barycentre pass.
+- `src/export`: SVG and draw.io exporters.
+- `src/components`: toolbar, explorer (left), canvas, details pane (right).
