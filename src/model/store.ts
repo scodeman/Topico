@@ -38,6 +38,8 @@ export interface UiState {
   showStubs: boolean;
   sketchExport: boolean;
   hoverTopic: string | null;
+  /** Chain shown in the broker-tube view, or null for the normal diagram. */
+  chainView: string | null;
 }
 
 const GROUP_COLORS = ['#0ea5e9', '#f97316', '#a855f7', '#22c55e', '#ef4444', '#eab308', '#14b8a6', '#ec4899'];
@@ -85,6 +87,7 @@ const initialUi: UiState = {
   showStubs: true,
   sketchExport: false,
   hoverTopic: null,
+  chainView: null,
 };
 
 const toggle = (list: string[], id: string) => (list.includes(id) ? list.filter((x) => x !== id) : [...list, id]);
@@ -103,13 +106,13 @@ export const useStore = create<Store>()(
       updateCentre: (patch) => set((s) => void Object.assign(s.model.centre, patch)),
 
       addSystem: (init = {}) => {
-        const id = newId(init.kind === 'exe' ? 'x' : 's');
+        const id = newId(init.kind === 'etl' ? 'x' : 's');
         set((s) => {
           const parent = init.parentId ? s.model.systems.find((x) => x.id === init.parentId) : undefined;
           const count = s.model.systems.length + 1;
           s.model.systems.push({
             id,
-            name: init.kind === 'exe' ? `EXE ${count}` : `SYSTEM ${count}`,
+            name: init.kind === 'etl' ? `ETL ${count}` : `SYSTEM ${count}`,
             kind: init.kind ?? 'system',
             side: parent?.side ?? init.side ?? 'W',
             parentId: parent?.id ?? null,
@@ -225,6 +228,7 @@ export const useStore = create<Store>()(
           for (const t of s.model.topics) if (t.bundleId === id) t.bundleId = null;
           for (const i of s.model.interactions) i.chainIds = i.chainIds.filter((c) => c !== id);
           s.ui.filterTopics = s.ui.filterTopics.filter((x) => x !== `grp:${id}`);
+          if (s.ui.chainView === id) s.ui.chainView = null;
           s.ui.focus = null;
         }),
       setGroupMembers: (groupId, memberIds) =>

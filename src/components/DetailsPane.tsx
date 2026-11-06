@@ -77,10 +77,10 @@ function SystemPane({ id }: { id: string }) {
 
   return (
     <div>
-      <h3 className="pane-kind">{sys.kind === 'exe' ? 'Executable' : 'System'}</h3>
+      <h3 className="pane-kind">{sys.kind === 'etl' ? 'ETL' : 'System'}</h3>
       <Text label="Name" value={sys.name} onChange={(name) => st().updateSystem(id, { name })} />
       <div className="row2">
-        <Select label="Kind" value={sys.kind} options={[['system', 'System'], ['exe', 'Executable']]} onChange={(kind) => st().updateSystem(id, { kind: kind as 'system' | 'exe' })} />
+        <Select label="Kind" value={sys.kind} options={[['system', 'System'], ['etl', 'ETL']]} onChange={(kind) => st().updateSystem(id, { kind: kind as 'system' | 'etl' })} />
         <Select
           label="Border"
           value={sys.side}
@@ -104,7 +104,7 @@ function SystemPane({ id }: { id: string }) {
       <div className="btn-row">
         <button onClick={() => st().filterOn('system', id, false)}>Focus view</button>
         <button onClick={() => st().addSystem({ kind: 'system', parentId: id })}>+ Upstream system</button>
-        <button onClick={() => st().addSystem({ kind: 'exe', parentId: id })}>+ Upstream exe</button>
+        <button onClick={() => st().addSystem({ kind: 'etl', parentId: id })}>+ Upstream ETL</button>
       </div>
 
       {(['produce', 'consume'] as Direction[]).map((dir) => (
@@ -147,7 +147,7 @@ function InteractionTopic({ interaction: i }: { interaction: Interaction }) {
         </span>
       </summary>
       <div className="endpoint-fields">
-        <ChainPicker interaction={i} label="Functional chains (this endpoint)" />
+        <ChainPicker interaction={i} label="Chains (this endpoint)" />
       </div>
       <TopicFields id={topic.id} />
     </details>
@@ -269,11 +269,11 @@ function GroupPane({ id }: { id: string }) {
   const isBundle = g.type === 'bundle';
   return (
     <div>
-      <h3 className="pane-kind">{isBundle ? 'Bundle' : 'Functional chain'}</h3>
+      <h3 className="pane-kind">{isBundle ? 'Bundle' : 'Chain'}</h3>
       <p className="muted small">
         {isBundle
           ? 'A bundle groups whole topics, wherever they are produced or consumed.'
-          : 'A functional chain groups individual endpoints: pick which systems producing or consuming a topic take part in it.'}
+          : 'A chain groups individual endpoints: pick which systems producing or consuming a topic take part in it.'}
       </p>
       <div className="row2">
         <Text label="Name" value={g.name} onChange={(name) => st().updateGroup(id, { name })} />
@@ -367,7 +367,7 @@ function ChainDots({ chainIds }: { chainIds: string[] }) {
   );
 }
 
-/** Pick the functional chains of one endpoint (interaction); an endpoint can be in several chains. */
+/** Pick the chains of one endpoint (interaction); an endpoint can be in several chains. */
 function ChainPicker({ interaction: i, label, compact }: { interaction: Interaction; label?: string; compact?: boolean }) {
   const groups = useStore((s) => s.model.groups);
   const chains = groups.filter((g) => g.type === 'chain');
@@ -387,7 +387,7 @@ function ChainPicker({ interaction: i, label, compact }: { interaction: Interact
         );
       })}
       {available.length > 0 && (
-        <select value="" title="Add this endpoint to a functional chain" onChange={(e) => e.target.value && set([...i.chainIds, e.target.value])}>
+        <select value="" title="Add this endpoint to a chain" onChange={(e) => e.target.value && set([...i.chainIds, e.target.value])}>
           <option value="">{i.chainIds.length ? '+' : compact ? '+ chain' : 'Add to chain…'}</option>
           {available.map((g) => (
             <option key={g.id} value={g.id}>{g.name}</option>

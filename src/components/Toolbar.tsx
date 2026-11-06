@@ -1,16 +1,32 @@
 import { useRef } from 'react';
 import { useView } from '../engine/useView';
-import { download, toDrawio, toJson, toSvg } from '../export/exporters';
 import { resetToEmpty, resetToSample, useStore } from '../model/store';
 import type { CollapseBy } from '../engine/view';
 
 export function Toolbar() {
-  const { model, ui, vm, layout } = useView();
+  const { model, ui, vm, layout, chainLayout } = useView();
   const setUi = useStore((s) => s.setUi);
   const setModel = useStore((s) => s.setModel);
   const fileRef = useRef<HTMLInputElement>(null);
   const base = (model.centre.name || 'topico').toLowerCase().replace(/[^a-z0-9]+/g, '-');
-  const suffix = vm.filtered ? '-view' : '';
+  const suffix = chainLayout ? `-chain-${chainLayout.chainName.toLowerCase().replace(/[^a-z0-9]+/g, '-')}` : vm.filtered ? '-view' : '';
+  // Exporters (and react-dom/server, which they use) are loaded on first use to keep the initial bundle small.
+  type Exporters = typeof import('../export/exporters');
+  const withExporters = (fn: (ex: Exporters) => void) => () => void import('../export/exporters').then(fn);
+  // Exports follow what the canvas shows: the broker-tube chain view when it is on.
+  const exportSvg = withExporters((ex) =>
+    ex.download(`${base}${suffix}.svg`, chainLayout ? ex.toChainSvg(chainLayout) : ex.toSvg(layout, vm, model.groups, ui.showStubs), 'image/svg+xml'),
+  );
+  const exportDrawio = withExporters((ex) =>
+    ex.download(
+      `${base}${suffix}.drawio`,
+      chainLayout
+        ? ex.toChainDrawio(chainLayout, { sketch: ui.sketchExport })
+        : ex.toDrawio(layout, vm, model.groups, { sketch: ui.sketchExport, showStubs: ui.showStubs, title: model.centre.name }),
+      'application/xml',
+    ),
+  );
+  const saveJson = withExporters((ex) => ex.download(`${base}.topico.json`, ex.toJson(model), 'application/json'));
 
   const importJson = async (file: File) => {
     try {
@@ -38,7 +54,7 @@ export function Toolbar() {
             e.target.value = '';
           }}
         />
-        <button onClick={() => download(`${base}.topico.json`, toJson(model), 'application/json')}>Save JSON</button>
+        <button onClick={saveJson}>Save JSON</button>
       </div>
       <div className="tb-group">
         <label>
@@ -46,7 +62,7 @@ export function Toolbar() {
           <select value={ui.collapseBy} onChange={(e) => setUi({ collapseBy: e.target.value as CollapseBy })}>
             <option value="none">individually</option>
             <option value="bundle">by bundle</option>
-            <option value="chain">by functional chain</option>
+            <option value="chain">by chain</option>
           </select>
         </label>
         <label title="When several systems are focused, only show topics exchanged between them">
@@ -58,18 +74,8 @@ export function Toolbar() {
       </div>
       <div className="tb-group tb-right">
         <span className="muted">Export view:</span>
-        <button onClick={() => download(`${base}${suffix}.svg`, toSvg(layout, vm, model.groups, ui.showStubs), 'image/svg+xml')}>SVG</button>
-        <button
-          onClick={() =>
-            download(
-              `${base}${suffix}.drawio`,
-              toDrawio(layout, vm, model.groups, { sketch: ui.sketchExport, showStubs: ui.showStubs, title: model.centre.name }),
-              'application/xml',
-            )
-          }
-        >
-          draw.io
-        </button>
+        <button onClick={exportSvg}>SVG</button>
+        <button onClick={exportDrawio}>draw.io</button>
         <label title="Use draw.io's hand-drawn sketch style">
           <input type="checkbox" checked={ui.sketchExport} onChange={(e) => setUi({ sketchExport: e.target.checked })} /> sketch style
         </label>

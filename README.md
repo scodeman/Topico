@@ -16,11 +16,11 @@ npm run build
 | Element | Notes |
 |---|---|
 | **Centre** | The broker. Always drawn in the middle. |
-| **System** / **Exe** | Attached to a centre border (West, North, East, South), or *upstream* of another system, in which case it sits on that system's outer border in the same direction. |
+| **System** / **ETL** | An ETL is a processing job (**E**xtraction, **T**ransformation and **L**oading of topics), drawn as a small dark box. Both are attached to a centre border (West, North, East, South), or *upstream* of another system, in which case it sits on that system's outer border in the same direction. |
 | **Topic** | Drawn as a tab on the border between a system and its parent. |
 | **Interaction** | A system *produces* or *consumes* a topic. The direction is always relative to the system's parent (the broker, or the upstream system it hangs off). |
 | **Bundle** | A named group of whole topics. It is drawn as an outline around adjacent tabs. |
-| **Functional chain** | A named group of individual endpoints (this system producing or consuming this topic). The same topic can be in a chain at one system and outside it at another, and an endpoint can be in several chains. The chain colours its endpoint tabs (striped when an endpoint is in several chains), and colours the arrows that link two of its endpoints. |
+| **Chain** (topic chain) | A named group of individual endpoints (this system producing or consuming this topic). The same topic can be in a chain at one system and outside it at another, and an endpoint can be in several chains. The chain colours its endpoint tabs (striped when an endpoint is in several chains), and colours the arrows that link two of its endpoints. |
 
 Arrows are derived automatically. Inside each container (the broker or a system), every producer of a topic points to every consumer of that topic. A system relays a topic to its upstream systems: what it consumes from the broker it passes to its children, and the reverse.
 
@@ -30,7 +30,7 @@ The model is saved automatically in the browser (localStorage). Use **Save JSON*
 
 - **Click** a system, topic or the broker to edit it in the right pane. The system pane lists its produced and consumed topics, each with editable details.
 - **Double-click** a system or topic to focus the view on it. **Shift+double-click** adds more. You can also use the checkboxes in the left panel.
-  - One system: its topics, its upstream leaves and the executables on the broker it exchanges with.
+  - One system: its topics, its upstream leaves and the ETLs on the broker it exchanges with.
   - Several systems: only the topics they exchange (turn off *Shared topics only* to see all of their topics).
   - Topics: only the systems that produce or consume them.
   - The broker, or **Show all**: everything.
@@ -41,13 +41,41 @@ The model is saved automatically in the browser (localStorage). Use **Save JSON*
   - Double-click any item to rename it.
   - Right-click any item for Rename, Duplicate and Delete.
 - ● / ◌ hides or shows a system (with its upstream systems) or a topic. Single interactions can be hidden from the system or topic pane.
-- **Group topics** collapses topics into one tab per bundle or per functional chain.
+- Click **View** on a chain in the left panel to see it as a broker tube: topics are bars inside the tube, and the chain's systems sit around it. Click again, or use "Back to diagram", to return. SVG and draw.io export the tube view while it is shown.
+- **Group topics** collapses topics into one tab per bundle or per chain.
 - The layout is recomputed on every change. It sizes boxes to their content, reorders tabs to reduce crossings and keeps bundle members together, and it never lets boxes overlap.
 
 ## Export
 
 - **SVG**: the current view, as a standalone file.
 - **draw.io**: an mxGraph `.drawio` file of the current view, which opens in diagrams.net or the draw.io desktop app. Tick *sketch style* to get the hand-drawn look.
+
+## Publishing (GitLab Pages or GitHub Pages)
+
+The app is fully static. The build uses relative asset paths (`base: './'` in `vite.config.ts`), so it works from any sub-path or custom domain.
+
+### GitLab Pages
+
+[`.gitlab-ci.yml`](.gitlab-ci.yml) has two jobs:
+
+- **`test`** runs the typecheck and tests on every branch and merge request.
+- **`pages`** runs on the default branch. It builds the app and publishes it at `https://<namespace>.gitlab.io/<project>/`. The project's **Deploy → Pages** settings show the exact address.
+
+### GitHub Pages
+
+[`.github/workflows/pages.yml`](.github/workflows/pages.yml) has three jobs:
+
+- **`test`** runs the typecheck and tests on every push and pull request.
+- **`build`** and **`deploy`** run on the default branch and publish the app at `https://<user-or-org>.github.io/<repo>/`.
+
+One-time setup: in the repository, open **Settings → Pages → Build and deployment** and set **Source** to **GitHub Actions**.
+
+### Things to know
+
+- Each visitor's diagram is saved in **their own browser**, and nothing is sent to GitLab or GitHub. To share a model, use **Save JSON** and **Open…**, or commit the JSON file to the repository.
+- **Who can see the site:**
+  - **GitLab:** Pages can be restricted to project members under **Settings → General → Visibility → Pages**.
+  - **GitHub:** Pages sites are public, even from a private repository, unless the organization is on GitHub Enterprise Cloud with private Pages. Publishing from a private repository also needs a paid plan.
 
 ## Code map
 

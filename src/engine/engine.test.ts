@@ -20,7 +20,7 @@ describe('computeView', () => {
     expect(Object.keys(view({ filterSystems: ['centre', 'n1'] }).nodes)).toHaveLength(15);
   });
 
-  it('single system shows its topics, its exe partners and stubs (SINGLE_SYS.png)', () => {
+  it('single system shows its topics, its ETL partners and stubs (SINGLE_SYS.png)', () => {
     const vm = view({ filterSystems: ['n1'] });
     expect(Object.keys(vm.nodes).sort()).toEqual(['n1', 'xw1']);
     expect(vm.nodes.n1.tabs.map((t) => t.topicId).sort()).toEqual(['t1', 't10', 't2', 't3', 't4', 't5', 't6', 't7']);
@@ -68,7 +68,7 @@ describe('computeView', () => {
   });
 });
 
-describe('functional chains (endpoint membership)', () => {
+describe('chains (endpoint membership)', () => {
   const order = groupTopicId('c-order');
 
   it('colours only the arrows whose two endpoints are in the chain', () => {
@@ -128,6 +128,11 @@ describe('functional chains (endpoint membership)', () => {
     expect(n1).toContain('t6');
     // SOUTH SYS 1 consumes TOPIC 5 outside the chain: its plain tab is fed by NORTH SYS 1's chain tab.
     expect(vm.edges.some((e) => e.from.nodeId === 'n1' && e.from.tabId === order && e.to.nodeId === 's1' && e.to.tabId === 't5')).toBe(true);
+  });
+
+  it('migrates the old "exe" kind to ETL', () => {
+    const m = normalizeModel({ systems: [{ id: 'x', name: 'X', kind: 'exe' }, { id: 's', name: 'S' }] });
+    expect(m.systems.map((s) => s.kind)).toEqual(['etl', 'system']);
   });
 
   it('migrates single-chain endpoints (v0.2–0.5) to a chain list', () => {

@@ -43,7 +43,7 @@ export interface ViewTab {
   topicId: string;
   role: Role;
   interactionIds: string[];
-  /** Functional chains of the endpoints shown by this tab. */
+  /** Chains of the endpoints shown by this tab. */
   chainIds: string[];
 }
 
@@ -89,7 +89,7 @@ export interface ViewEdge {
   topicIds: string[];
   from: Endpoint;
   to: Endpoint;
-  /** Functional chains shared by both ends of the carried flow(s). */
+  /** Chains shared by both ends of the carried flow(s). */
   chainIds: string[];
 }
 
@@ -308,10 +308,10 @@ export function computeView(model: Model, opts: ViewOptions): ViewModel {
       const shared = [...wanted].filter((t) => perSystem.filter((s) => s.has(t)).length >= 2);
       if (shared.length) wanted = new Set(shared);
     }
-    // Related nodes: the selection, its upstream subtree, its ancestors, and executables on the broker.
+    // Related nodes: the selection, its upstream subtree, its ancestors, and ETLs on the broker.
     const related = new Set<string>(withAncestors(filterSystems));
     for (const id of filterSystems) descendants(model, id).forEach((d) => related.add(d));
-    for (const s of model.systems) if (s.kind === 'exe' && s.parentId === null) related.add(s.id);
+    for (const s of model.systems) if (s.kind === 'etl' && s.parentId === null) related.add(s.id);
     visible = active.filter((i) => related.has(i.systemId) && wanted.has(i.topicId));
     visibleSystems = withAncestors([...filterSystems, ...visible.map((i) => i.systemId)]);
   }

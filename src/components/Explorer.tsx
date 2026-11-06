@@ -99,7 +99,7 @@ export function Explorer() {
         <Row
           depth={depth}
           label={s.name}
-          badge={s.kind === 'exe' ? 'exe' : undefined}
+          badge={s.kind === 'etl' ? 'ETL' : undefined}
           checked={ui.filterSystems.includes(s.id)}
           onCheck={() => st().filterOn('system', s.id, true)}
           active={focusId === s.id}
@@ -155,7 +155,7 @@ export function Explorer() {
         actions={
           <>
             <button onClick={() => st().addSystem({ kind: 'system' })}>+ System</button>
-            <button onClick={() => st().addSystem({ kind: 'exe' })}>+ Exe</button>
+            <button onClick={() => st().addSystem({ kind: 'etl' })}>+ ETL</button>
           </>
         }
       >
@@ -224,7 +224,7 @@ export function Explorer() {
       {(['bundle', 'chain'] as const).map((type) => (
         <Section
           key={type}
-          title={type === 'bundle' ? 'Bundles' : 'Functional chains'}
+          title={type === 'bundle' ? 'Bundles' : 'Chains'}
           actions={<button onClick={() => st().addGroup(type)}>+ {type === 'bundle' ? 'Bundle' : 'Chain'}</button>}
         >
           {groupsOf(type)
@@ -236,9 +236,22 @@ export function Explorer() {
                   ? `${model.topics.filter((t) => t.bundleId === g.id).length} topics`
                   : `${model.interactions.filter((i) => i.chainIds.includes(g.id)).length} endpoints`;
               const filterId = groupTopicId(g.id);
+              const viewing = ui.chainView === g.id;
               return (
                 <Row
                   key={g.id}
+                  extra={
+                    type === 'chain' && (
+                      <button
+                        className={`view-btn${viewing ? ' on' : ''}`}
+                        onClick={() => st().setUi({ chainView: viewing ? null : g.id })}
+                        title={viewing ? 'Back to the diagram' : 'Show this chain as a broker tube'}
+                        aria-pressed={viewing}
+                      >
+                        {viewing ? 'Viewing' : 'View'}
+                      </button>
+                    )
+                  }
                   depth={0}
                   label={g.name}
                   badge={count}
@@ -369,6 +382,8 @@ function Row(p: {
   onClick: () => void;
   hidden?: boolean;
   onToggleHidden?: () => void;
+  /** Extra control shown before the visibility toggle (e.g. chain view). */
+  extra?: ReactNode;
   editing: boolean;
   onStartRename(): void;
   onRename(name: string): void;
@@ -411,6 +426,7 @@ function Row(p: {
         </button>
       )}
       {p.badge && <span className="badge">{p.badge}</span>}
+      {p.extra}
       {p.onToggleHidden && (
         <button className="eye" onClick={p.onToggleHidden} title={p.hidden ? 'Show' : 'Hide'}>
           {p.hidden ? '◌' : '●'}

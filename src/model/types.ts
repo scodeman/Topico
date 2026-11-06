@@ -2,7 +2,7 @@ export type Side = 'W' | 'N' | 'E' | 'S';
 export const SIDES: Side[] = ['W', 'N', 'E', 'S'];
 export const SIDE_LABEL: Record<Side, string> = { W: 'West', N: 'North', E: 'East', S: 'South' };
 
-export type NodeKind = 'system' | 'exe';
+export type NodeKind = 'system' | 'etl';
 /** Direction is always relative to the node's parent (the centre broker, or the upstream system it hangs off). */
 export type Direction = 'produce' | 'consume';
 export type GroupType = 'bundle' | 'chain';
@@ -52,7 +52,7 @@ export interface Interaction {
   direction: Direction;
   hidden: boolean;
   /**
-   * Functional chains this endpoint (this system producing/consuming this topic) takes part in.
+   * Chains this endpoint (this system producing/consuming this topic) takes part in.
    * Chains group individual endpoints, not whole topics, and an endpoint can be in several chains.
    */
   chainIds: string[];
@@ -96,7 +96,7 @@ export function emptyModel(): Model {
 export function normalizeModel(raw: unknown): Model {
   const m = (raw ?? {}) as {
     centre?: Partial<Centre>;
-    systems?: Partial<SystemNode>[];
+    systems?: (Omit<Partial<SystemNode>, 'kind'> & { kind?: NodeKind | 'exe' })[];
     topics?: (Partial<Topic> & { chainId?: string | null })[];
     interactions?: (Partial<Interaction> & { chainId?: string | null })[];
     groups?: Partial<Group>[];
@@ -109,7 +109,8 @@ export function normalizeModel(raw: unknown): Model {
   return {
     version: 1,
     centre: { ...base.centre, ...(m.centre ?? {}), id: 'centre' },
-    systems: (m.systems ?? []).map((s) => ({ ...sysDefaults, ...s }) as SystemNode),
+    // Older files call ETLs "exe".
+    systems: (m.systems ?? []).map((s) => ({ ...sysDefaults, ...s, kind: s.kind === 'exe' ? 'etl' : (s.kind ?? 'system') }) as SystemNode),
     topics: (m.topics ?? []).map(({ chainId: _legacy, ...t }) => ({ ...topicDefaults, ...t }) as Topic),
     interactions: (m.interactions ?? []).map(({ chainId, ...i }) => {
       const legacy = chainId ?? (i.topicId && legacyChain.get(i.topicId)) ?? null;

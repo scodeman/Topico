@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } fr
 import { useView } from '../engine/useView';
 import { CENTRE_ID } from '../model/types';
 import { useStore } from '../model/store';
+import { ChainSvg, type ChainHandlers } from './ChainSvg';
 import { DiagramSvg, type DiagramHandlers } from './DiagramSvg';
 
 interface Box {
@@ -12,17 +13,18 @@ interface Box {
 }
 
 export function Canvas() {
-  const { model, ui, vm, layout } = useView();
+  const { model, ui, vm, layout, chainLayout } = useView();
   const setFocus = useStore((s) => s.setFocus);
   const filterOn = useStore((s) => s.filterOn);
   const setUi = useStore((s) => s.setUi);
   const wrapRef = useRef<HTMLDivElement>(null);
-  const [box, setBox] = useState<Box>(layout.bounds);
+  const bounds = chainLayout?.bounds ?? layout.bounds;
+  const [box, setBox] = useState<Box>(bounds);
   const drag = useRef<{ x: number; y: number; box: Box; moved: boolean } | null>(null);
 
-  const fit = useCallback(() => setBox(layout.bounds), [layout.bounds]);
-  // Re-fit whenever the arrangement changes size (selection, hiding, grouping…).
-  const b = layout.bounds;
+  const fit = useCallback(() => setBox(bounds), [bounds]);
+  // Re-fit whenever the arrangement changes size (selection, hiding, grouping, chain view…).
+  const b = bounds;
   useEffect(fit, [b.x, b.y, b.w, b.h, fit]);
 
   useEffect(() => {
@@ -90,6 +92,20 @@ export function Canvas() {
     }),
     [setFocus, filterOn, setUi],
   );
+  const chainHandlers: ChainHandlers = useMemo(
+    () => ({
+      onNodeClick: (id, e) => {
+        e.stopPropagation();
+        if (!wasDrag()) setFocus({ kind: 'system', id });
+      },
+      onBarClick: (topicId, e) => {
+        e.stopPropagation();
+        if (!wasDrag()) setFocus({ kind: 'topic', id: topicId });
+      },
+      onHoverTopic: (topicId) => setUi({ hoverTopic: topicId }),
+    }),
+    [setFocus, setUi],
+  );
 
   const focus = ui.focus;
   const selectedNodes = new Set(ui.filterSystems);
@@ -102,30 +118,46 @@ export function Canvas() {
   return (
     <div className="canvas" ref={wrapRef} onMouseMove={onMouseMove} onMouseUp={endDrag} onMouseLeave={endDrag}>
       <FilterBar />
-      <DiagramSvg
-        layout={layout}
-        vm={vm}
-        groups={model.groups}
-        showStubs={ui.showStubs}
-        selectedNodes={selectedNodes}
-        selectedTopics={selectedTopics}
-        hoverTopic={ui.hoverTopic}
-        handlers={handlers}
-        animate
-        svgProps={{
-          viewBox: `${box.x} ${box.y} ${box.w} ${box.h}`,
-          preserveAspectRatio: 'xMidYMid meet',
-          className: 'diagram',
-          onMouseDown,
-        }}
-      />
+      {chainLayout ? (
+        <ChainSvg
+          layout={chainLayout}
+          selectedNodes={selectedNodes}
+          selectedTopics={selectedTopics}
+          hoverTopic={ui.hoverTopic}
+          handlers={chainHandlers}
+          svgProps={{
+            viewBox: `${box.x} ${box.y} ${box.w} ${box.h}`,
+            preserveAspectRatio: 'xMidYMid meet',
+            className: 'diagram',
+            onMouseDown,
+          }}
+        />
+      ) : (
+        <DiagramSvg
+          layout={layout}
+          vm={vm}
+          groups={model.groups}
+          showStubs={ui.showStubs}
+          selectedNodes={selectedNodes}
+          selectedTopics={selectedTopics}
+          hoverTopic={ui.hoverTopic}
+          handlers={handlers}
+          animate
+          svgProps={{
+            viewBox: `${box.x} ${box.y} ${box.w} ${box.h}`,
+            preserveAspectRatio: 'xMidYMid meet',
+            className: 'diagram',
+            onMouseDown,
+          }}
+        />
+      )}
       <div className="canvas-tools">
         <button onClick={fit} title="Fit to screen">Fit</button>
         <button onClick={() => setBox((bx) => zoom(bx, 0.8))} title="Zoom in">+</button>
         <button onClick={() => setBox((bx) => zoom(bx, 1.25))} title="Zoom out">−</button>
       </div>
       <Legend />
-      {Object.keys(vm.nodes).length === 0 && (
+      {!chainLayout && Object.keys(vm.nodes).length === 0 && (
         <div className="empty-hint">Add systems and topics from the left panel to start drawing.</div>
       )}
     </div>
@@ -143,6 +175,7 @@ function FilterBar() {
   const model = useStore((s) => s.model);
   const filterOn = useStore((s) => s.filterOn);
   const clear = useStore((s) => s.clearFilter);
+  const setUi = useStore((s) => s.setUi);
   const sysName = (id: string) => model.systems.find((s) => s.id === id)?.name ?? id;
   const topicName = (id: string) =>
     id.startsWith('grp:') ? model.groups.find((g) => g.id === id.slice(4))?.name ?? id : model.topics.find((t) => t.id === id)?.name ?? id;
@@ -150,6 +183,18 @@ function FilterBar() {
     ...ui.filterSystems.map((id) => ({ id, kind: 'system' as const, label: sysName(id) })),
     ...ui.filterTopics.map((id) => ({ id, kind: 'topic' as const, label: topicName(id) })),
   ];
+  const chain = ui.chainView ? model.groups.find((g) => g.id === ui.chainView) : undefined;
+  if (chain) {
+    return (
+      <div className="filter-bar">
+        <span className="chip chip-chain" style={{ borderColor: chain.color }}>
+          Chain view: {chain.name}
+          <button onClick={() => setUi({ chainView: null })} title="Back to the diagram">×</button>
+        </span>
+        <button className="link" onClick={() => setUi({ chainView: null })}>Back to diagram</button>
+      </div>
+    );
+  }
   return (
     <div className="filter-bar">
       {chips.length === 0 ? (

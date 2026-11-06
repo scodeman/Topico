@@ -65,7 +65,7 @@ const clone = <T,>(x: T): T => JSON.parse(JSON.stringify(x));
 export function duplicateSystem(m: Model, id: string): string | null {
   const src = m.systems.find((s) => s.id === id);
   if (!src) return null;
-  const copy = { ...clone(src), id: newId(src.kind === 'exe' ? 'x' : 's'), name: copyName(src.name) };
+  const copy = { ...clone(src), id: newId(src.kind === 'etl' ? 'x' : 's'), name: copyName(src.name) };
   m.systems.splice(m.systems.indexOf(src) + 1, 0, copy);
   for (const i of m.interactions.filter((x) => x.systemId === id)) {
     m.interactions.push({ ...clone(i), id: newId('i'), systemId: copy.id });

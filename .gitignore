@@ -2,3 +2,6 @@ node_modules
 dist
 .$*.drawio.*
 .DS_Store
+public
+.gitlab-ci-local
+.npm

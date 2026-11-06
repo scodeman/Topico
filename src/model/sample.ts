@@ -9,12 +9,12 @@ export function sampleModel(): Model {
     sys('n1', 'NORTH SYS 1', 'N'),
     sys('n2', 'NORTH SYS 2', 'N'),
     sys('n3', 'NORTH SYS 3', 'N'),
-    sys('n21', 'EXE N2.1', 'N', 'n2', 'exe'),
+    sys('n21', 'ETL N2.1', 'N', 'n2', 'etl'),
     sys('w11', 'WEST SYS 11', 'W'),
     sys('w2', 'WEST SYS 2', 'W'),
     sys('w21', 'WEST SYS 2.1', 'W', 'w2'),
     sys('w22', 'WEST SYS 2.2', 'W', 'w2'),
-    sys('xw1', 'ETL W1', 'W', null, 'exe'),
+    sys('xw1', 'ETL W1', 'W', null, 'etl'),
     sys('e1', 'EAST SYS 1', 'E'),
     sys('e11', 'EAST SYS 1.1', 'E', 'e1'),
     sys('e12x', 'EAST SYS 1.2', 'E', 'e1'),
@@ -59,7 +59,7 @@ export function sampleModel(): Model {
     ['s1', 'produce', [9]],
     ['s1', 'consume', [1, 2, 3, 4, 5, 6, 7, 8, 10]],
   ];
-  // Functional chains pick individual endpoints: e.g. TOPIC 5 is in "Order flow" only between NORTH SYS 1 and ETL W1.
+  // Chains pick individual endpoints: e.g. TOPIC 5 is in "Order flow" only between NORTH SYS 1 and ETL W1.
   // An endpoint can be in several chains: SOUTH SYS 1 publishing TOPIC 9 is in both "Billing" and "Settlement".
   const chains: Record<string, string[]> = {
     'n1-p-5': [chainOrder], 'xw1-c-5': [chainOrder], 'xw1-p-10': [chainOrder], 'w2-c-10': [chainOrder],

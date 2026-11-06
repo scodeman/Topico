@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import { useStore } from '../model/store';
+import { computeChainLayout } from './chainView';
 import { layoutView } from './layout';
 import { computeView } from './view';
 
@@ -18,5 +19,7 @@ export function useView() {
     [model, ui.filterSystems, ui.filterTopics, ui.collapseBy, ui.sharedOnly],
   );
   const layout = useMemo(() => layoutView(vm), [vm]);
-  return { model, ui, vm, layout };
+  // Broker-tube view of one chain, when toggled from the explorer.
+  const chainLayout = useMemo(() => (ui.chainView ? computeChainLayout(model, ui.chainView) : null), [model, ui.chainView]);
+  return { model, ui, vm, layout, chainLayout };
 }

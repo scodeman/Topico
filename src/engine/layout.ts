@@ -8,8 +8,8 @@ export const K = {
   SYS_DEPTH: 130,
   SYS_DEPTH_WITH_CHILDREN: 180,
   SYS_MIN_SPAN: 180,
-  EXE_DEPTH: 90,
-  EXE_MIN_SPAN: 76,
+  ETL_DEPTH: 90,
+  ETL_MIN_SPAN: 76,
   NODE_PAD: 20,
   SIB_GAP: 28,
   CENTRE_PAD: 60,
@@ -113,10 +113,10 @@ function measureAll(vm: ViewModel): Map<string, Measure> {
     if (cached) return cached;
     const kids = n.children.map((c) => visit(vm.nodes[c]));
     const childrenSpan = kids.reduce((a, k) => a + k.span, 0) + Math.max(0, kids.length - 1) * K.SIB_GAP;
-    const exe = n.kind === 'exe';
-    const tabsSpan = n.tabs.length * K.TAB_T + 2 * (exe ? 8 : K.NODE_PAD);
-    const span = Math.max(exe ? K.EXE_MIN_SPAN : K.SYS_MIN_SPAN, tabsSpan, childrenSpan);
-    const depth = exe ? K.EXE_DEPTH : kids.length ? K.SYS_DEPTH_WITH_CHILDREN : K.SYS_DEPTH;
+    const etl = n.kind === 'etl';
+    const tabsSpan = n.tabs.length * K.TAB_T + 2 * (etl ? 8 : K.NODE_PAD);
+    const span = Math.max(etl ? K.ETL_MIN_SPAN : K.SYS_MIN_SPAN, tabsSpan, childrenSpan);
+    const depth = etl ? K.ETL_DEPTH : kids.length ? K.SYS_DEPTH_WITH_CHILDREN : K.SYS_DEPTH;
     const m = { span, depth, childrenSpan };
     out.set(n.id, m);
     return m;

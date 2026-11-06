@@ -9,7 +9,7 @@ export const COLORS = {
   centreFill: '#eef2f8',
   nodeFill: '#ffffff',
   nodeSide: '#dbe2ec',
-  exeFill: '#1e293b',
+  etlFill: '#1e293b',
   accent: '#2563eb',
   bg: '#ffffff',
 };
@@ -61,7 +61,7 @@ export function DiagramSvg(p: DiagramProps) {
   const node = (n: NodeGeom) => {
     const sel = p.selectedNodes?.has(n.id);
     const { w, h } = n.rect;
-    const exe = n.kind === 'exe';
+    const etl = n.kind === 'etl';
     const d = 8; // fake 3D depth for systems
     return (
       <g
@@ -72,10 +72,10 @@ export function DiagramSvg(p: DiagramProps) {
         onClick={handlers ? (e) => handlers.onNodeClick(n.id, e) : undefined}
         onDoubleClick={handlers ? (e) => handlers.onNodeDoubleClick(n.id, e) : undefined}
       >
-        {exe ? (
+        {etl ? (
           <>
-            <rect width={w} height={h} rx={6} fill={COLORS.exeFill} stroke={sel ? COLORS.accent : COLORS.exeFill} strokeWidth={sel ? 3 : 1} />
-            <ExeLoop n={n} />
+            <rect width={w} height={h} rx={6} fill={COLORS.etlFill} stroke={sel ? COLORS.accent : COLORS.etlFill} strokeWidth={sel ? 3 : 1} />
+            <EtlLoop n={n} />
           </>
         ) : (
           <>
@@ -253,14 +253,14 @@ function wrap(text: string, maxChars: number, maxLines = 3): string[] {
 }
 
 function NodeLabel({ n }: { n: NodeGeom }) {
-  const exe = n.kind === 'exe';
-  const size = exe ? 10 : 12;
+  const etl = n.kind === 'etl';
+  const size = etl ? 10 : 12;
   const a = labelArea(n);
   const lines = wrap(n.name, Math.max(3, Math.floor((a.w - 8) / (size * 0.62))));
   const lh = size * 1.25;
   const y0 = a.y + a.h / 2 - ((lines.length - 1) * lh) / 2;
   return (
-    <text textAnchor="middle" dominantBaseline="middle" fontFamily={FONT} fontSize={size} fontWeight={600} fill={exe ? '#fff' : COLORS.ink}>
+    <text textAnchor="middle" dominantBaseline="middle" fontFamily={FONT} fontSize={size} fontWeight={600} fill={etl ? '#fff' : COLORS.ink}>
       {lines.map((l, i) => (
         <tspan key={i} x={a.x + a.w / 2} y={y0 + i * lh}>
           {l}
@@ -270,8 +270,8 @@ function NodeLabel({ n }: { n: NodeGeom }) {
   );
 }
 
-function ExeLoop({ n }: { n: NodeGeom }) {
-  // Small "processing loop" glyph on the outer side of an executable.
+function EtlLoop({ n }: { n: NodeGeom }) {
+  // Small "processing loop" glyph on the outer side of an ETL.
   const { w, h } = n.rect;
   const pos = { W: [-2, h / 2], E: [w + 2, h / 2], N: [w / 2, -2], S: [w / 2, h + 2] }[n.side];
   const [cx, cy] = pos;
@@ -280,7 +280,7 @@ function ExeLoop({ n }: { n: NodeGeom }) {
     <path
       d={`M${cx - r * 0.7},${cy - r * 0.7} A${r},${r} 0 1 1 ${cx - r * 0.7},${cy + r * 0.7}`}
       fill="none"
-      stroke={COLORS.exeFill}
+      stroke={COLORS.etlFill}
       strokeWidth={1.4}
       markerEnd="url(#arrow-muted)"
       transform={n.side === 'W' ? `rotate(180 ${cx} ${cy})` : n.side === 'N' ? `rotate(-90 ${cx} ${cy})` : n.side === 'S' ? `rotate(90 ${cx} ${cy})` : undefined}
