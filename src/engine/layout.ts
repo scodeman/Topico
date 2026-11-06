@@ -59,7 +59,8 @@ export interface EdgeGeom {
   id: string;
   /** Model topics carried by the arrow. */
   topicIds: string[];
-  chainId: string | null;
+  /** Chains shared by both ends of the arrow. */
+  chainIds: string[];
   container: string;
   d: string;
   points: [Vec, Vec, Vec, Vec];
@@ -208,7 +209,7 @@ function layoutOnce(vm: ViewModel, tabOrder: Map<string, string[]>): Layout {
     return {
       id: e.id,
       topicIds: e.topicIds,
-      chainId: e.chainId,
+      chainIds: e.chainIds,
       container: e.container,
       d: `M${r(a.p.x)},${r(a.p.y)} C${r(c1.x)},${r(c1.y)} ${r(c2.x)},${r(c2.y)} ${r(b.p.x)},${r(b.p.y)}`,
       points: [a.p, c1, c2, b.p],

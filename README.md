@@ -20,7 +20,7 @@ npm run build
 | **Topic** | Drawn as a tab on the border between a system and its parent. |
 | **Interaction** | A system *produces* or *consumes* a topic. The direction is always relative to the system's parent (the broker, or the upstream system it hangs off). |
 | **Bundle** | A named group of whole topics. It is drawn as an outline around adjacent tabs. |
-| **Functional chain** | A named group of individual endpoints (this system producing or consuming this topic). The same topic can be in a chain at one system and outside it at another. The chain colours its endpoint tabs, and colours the arrows that link two of its endpoints. |
+| **Functional chain** | A named group of individual endpoints (this system producing or consuming this topic). The same topic can be in a chain at one system and outside it at another, and an endpoint can be in several chains. The chain colours its endpoint tabs (striped when an endpoint is in several chains), and colours the arrows that link two of its endpoints. |
 
 Arrows are derived automatically. Inside each container (the broker or a system), every producer of a topic points to every consumer of that topic. A system relays a topic to its upstream systems: what it consumes from the broker it passes to its children, and the reverse.
 

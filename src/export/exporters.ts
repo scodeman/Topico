@@ -52,7 +52,8 @@ export function toDrawio(layout: Layout, vm: ViewModel, groups: Group[], opts: {
     const [p0, c1, c2, p3] = e.points;
     const ex = rel(from, p0);
     const en = rel(to, p3);
-    const color = chainColor(e.chainId) ?? COLORS.muted;
+    // draw.io edges have one colour: use the first chain's.
+    const color = chainColor(e.chainIds[0]) ?? COLORS.muted;
     const style = `curved=1;html=1;endArrow=classic;endFill=1;strokeColor=${color};exitX=${ex.x};exitY=${ex.y};exitDx=0;exitDy=0;exitPerimeter=0;entryX=${en.x};entryY=${en.y};entryDx=0;entryDy=0;entryPerimeter=0;${sk}`;
     cells.push(
       `<mxCell id="${esc(`e:${e.id}`)}" style="${esc(style)}" edge="1" parent="1" source="${esc(tabId(from))}" target="${esc(tabId(to))}"><mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="${c1.x}" y="${c1.y}"/><mxPoint x="${c2.x}" y="${c2.y}"/></Array></mxGeometry></mxCell>`,

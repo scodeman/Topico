@@ -26,6 +26,7 @@ export function sampleModel(): Model {
   const bundleRef = 'b-ref';
   const chainOrder = 'c-order';
   const chainBilling = 'c-billing';
+  const chainSettle = 'c-settle';
   const topic = (n: number, bundleId: string | null = null): Topic => ({
     id: `t${n}`, name: `TOPIC ${n}`, description: '', owner: '', format: 'Avro', properties: [], bundleId, hidden: false,
   });
@@ -59,15 +60,16 @@ export function sampleModel(): Model {
     ['s1', 'consume', [1, 2, 3, 4, 5, 6, 7, 8, 10]],
   ];
   // Functional chains pick individual endpoints: e.g. TOPIC 5 is in "Order flow" only between NORTH SYS 1 and ETL W1.
-  const chains: Record<string, string> = {
-    'n1-p-5': chainOrder, 'xw1-c-5': chainOrder, 'xw1-p-10': chainOrder, 'w2-c-10': chainOrder,
-    'n2-p-8': chainBilling, 'n21-p-8': chainBilling, 'e1-c-8': chainBilling, 'e11-c-8': chainBilling,
-    's1-p-9': chainBilling, 'e12-c-9': chainBilling,
+  // An endpoint can be in several chains: SOUTH SYS 1 publishing TOPIC 9 is in both "Billing" and "Settlement".
+  const chains: Record<string, string[]> = {
+    'n1-p-5': [chainOrder], 'xw1-c-5': [chainOrder], 'xw1-p-10': [chainOrder], 'w2-c-10': [chainOrder],
+    'n2-p-8': [chainBilling], 'n21-p-8': [chainBilling], 'e1-c-8': [chainBilling], 'e11-c-8': [chainBilling],
+    's1-p-9': [chainBilling, chainSettle], 'e12-c-9': [chainBilling], 'e1-c-9': [chainSettle],
   };
   const interactions = flows.flatMap(([systemId, direction, nums]) =>
     nums.map((n) => {
       const key = `${systemId}-${direction[0]}-${n}`;
-      return { id: `i-${key}`, systemId, topicId: `t${n}`, direction, hidden: false, chainId: chains[key] ?? null };
+      return { id: `i-${key}`, systemId, topicId: `t${n}`, direction, hidden: false, chainIds: chains[key] ?? [] };
     }),
   );
 
@@ -81,6 +83,7 @@ export function sampleModel(): Model {
       { id: bundleRef, name: 'Reference data', type: 'bundle', color: '#0ea5e9', description: '' },
       { id: chainOrder, name: 'Order flow', type: 'chain', color: '#f97316', description: '' },
       { id: chainBilling, name: 'Billing', type: 'chain', color: '#a855f7', description: '' },
+      { id: chainSettle, name: 'Settlement', type: 'chain', color: '#16a34a', description: '' },
     ],
   };
 }

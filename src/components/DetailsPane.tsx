@@ -136,7 +136,7 @@ function InteractionTopic({ interaction: i }: { interaction: Interaction }) {
       <summary>
         <span>
           {topic.name}
-          <ChainDot chainId={i.chainId} />
+          <ChainDots chainIds={i.chainIds} />
         </span>
         <span className="summary-actions" onClick={(e) => e.preventDefault()}>
           <label title="Hide this interaction">
@@ -147,7 +147,7 @@ function InteractionTopic({ interaction: i }: { interaction: Interaction }) {
         </span>
       </summary>
       <div className="endpoint-fields">
-        <ChainSelect interaction={i} label="Functional chain (this endpoint)" />
+        <ChainPicker interaction={i} label="Functional chains (this endpoint)" />
       </div>
       <TopicFields id={topic.id} />
     </details>
@@ -210,7 +210,7 @@ function TopicPane({ id }: { id: string }) {
             .map((i) => (
               <div key={i.id} className={`link-row${i.hidden ? ' is-hidden' : ''}`}>
                 <button className="link" onClick={() => st().setFocus({ kind: 'system', id: i.systemId })}>{sysName(i.systemId)}</button>
-                <ChainSelect interaction={i} compact />
+                <ChainPicker interaction={i} compact />
                 <label title="Hide this interaction">
                   <input type="checkbox" checked={i.hidden} onChange={(e) => st().updateInteraction(i.id, { hidden: e.target.checked })} /> hide
                 </label>
@@ -320,30 +320,34 @@ function ChainMembers({ groupId }: { groupId: string }) {
   const model = useStore((s) => s.model);
   const st = useStore.getState;
   const [showAll, setShowAll] = useState(false);
-  const members = model.interactions.filter((i) => i.chainId === groupId).map((i) => i.id);
+  const members = model.interactions.filter((i) => i.chainIds.includes(groupId)).map((i) => i.id);
   const sysName = (sid: string) => model.systems.find((s) => s.id === sid)?.name ?? sid;
+  const chainName = (c: string) => model.groups.find((x) => x.id === c)?.name;
   const set = (iid: string, on: boolean) => st().setGroupMembers(groupId, on ? [...members, iid] : members.filter((m) => m !== iid));
-  const topics = model.topics.filter((t) => showAll || model.interactions.some((i) => i.topicId === t.id && i.chainId === groupId));
+  const topics = model.topics.filter((t) => showAll || model.interactions.some((i) => i.topicId === t.id && i.chainIds.includes(groupId)));
   return (
     <section className="subsection">
       <h4>Endpoints ({members.length})</h4>
       <label className="check small">
         <input type="checkbox" checked={showAll} onChange={(e) => setShowAll(e.target.checked)} /> Show all topics to pick endpoints
       </label>
-      {topics.length === 0 && <p className="muted small">No endpoints yet. Tick the box above, or pick this chain on an endpoint from a system or topic pane.</p>}
+      {topics.length === 0 && <p className="muted small">No endpoints yet. Tick the box above, or add this chain to an endpoint from a system or topic pane.</p>}
       {topics.map((t) => {
         const eps = model.interactions.filter((i) => i.topicId === t.id);
         if (!eps.length) return null;
         return (
           <div key={t.id} className="chain-topic">
             <div className="chain-topic-name">{t.name}</div>
-            {eps.map((i) => (
-              <label key={i.id} className="check">
-                <input type="checkbox" checked={i.chainId === groupId} onChange={(e) => set(i.id, e.target.checked)} />
-                {sysName(i.systemId)} <span className="muted">{i.direction === 'produce' ? 'produces' : 'consumes'}</span>
-                {i.chainId && i.chainId !== groupId && <span className="muted small"> (in {model.groups.find((x) => x.id === i.chainId)?.name})</span>}
-              </label>
-            ))}
+            {eps.map((i) => {
+              const others = i.chainIds.filter((c) => c !== groupId).map(chainName).filter(Boolean);
+              return (
+                <label key={i.id} className="check">
+                  <input type="checkbox" checked={i.chainIds.includes(groupId)} onChange={(e) => set(i.id, e.target.checked)} />
+                  {sysName(i.systemId)} <span className="muted">{i.direction === 'produce' ? 'produces' : 'consumes'}</span>
+                  {others.length > 0 && <span className="muted small"> (also in {others.join(', ')})</span>}
+                </label>
+              );
+            })}
           </div>
         );
       })}
@@ -351,35 +355,54 @@ function ChainMembers({ groupId }: { groupId: string }) {
   );
 }
 
-function ChainDot({ chainId }: { chainId: string | null }) {
-  const g = useStore((s) => s.model.groups.find((x) => x.id === chainId));
-  if (!g) return null;
-  return <span className="dot inline" style={{ background: g.color }} title={`Chain: ${g.name}`} />;
+function ChainDots({ chainIds }: { chainIds: string[] }) {
+  const groups = useStore((s) => s.model.groups);
+  return (
+    <>
+      {chainIds.map((c) => {
+        const g = groups.find((x) => x.id === c);
+        return g ? <span key={c} className="dot inline" style={{ background: g.color }} title={`Chain: ${g.name}`} /> : null;
+      })}
+    </>
+  );
 }
 
-/** Pick the functional chain of one endpoint (interaction). */
-function ChainSelect({ interaction: i, label, compact }: { interaction: Interaction; label?: string; compact?: boolean }) {
+/** Pick the functional chains of one endpoint (interaction); an endpoint can be in several chains. */
+function ChainPicker({ interaction: i, label, compact }: { interaction: Interaction; label?: string; compact?: boolean }) {
   const groups = useStore((s) => s.model.groups);
   const chains = groups.filter((g) => g.type === 'chain');
   const st = useStore.getState;
-  const select = (
-    <select
-      value={i.chainId ?? ''}
-      title="Functional chain of this endpoint"
-      onChange={(e) => st().updateInteraction(i.id, { chainId: e.target.value || null })}
-    >
-      <option value="">{compact ? 'no chain' : '— none —'}</option>
-      {chains.map((g) => (
-        <option key={g.id} value={g.id}>{g.name}</option>
-      ))}
-    </select>
+  const set = (chainIds: string[]) => st().updateInteraction(i.id, { chainIds });
+  const available = chains.filter((g) => !i.chainIds.includes(g.id));
+  const body = (
+    <span className={`chain-picker${compact ? ' compact' : ''}`}>
+      {i.chainIds.map((c) => {
+        const g = chains.find((x) => x.id === c);
+        if (!g) return null;
+        return (
+          <span key={c} className="chain-chip" style={{ borderColor: g.color, background: `${g.color}22` }}>
+            {g.name}
+            <button onClick={() => set(i.chainIds.filter((x) => x !== c))} title={`Remove from ${g.name}`}>×</button>
+          </span>
+        );
+      })}
+      {available.length > 0 && (
+        <select value="" title="Add this endpoint to a functional chain" onChange={(e) => e.target.value && set([...i.chainIds, e.target.value])}>
+          <option value="">{i.chainIds.length ? '+' : compact ? '+ chain' : 'Add to chain…'}</option>
+          {available.map((g) => (
+            <option key={g.id} value={g.id}>{g.name}</option>
+          ))}
+        </select>
+      )}
+      {!chains.length && <span className="muted small">No chains defined</span>}
+    </span>
   );
-  if (compact) return <span className="chain-select-compact">{select}</span>;
+  if (compact) return body;
   return (
-    <label className="field">
+    <div className="field">
       <span>{label}</span>
-      {select}
-    </label>
+      {body}
+    </div>
   );
 }
 

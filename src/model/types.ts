@@ -51,8 +51,11 @@ export interface Interaction {
   topicId: string;
   direction: Direction;
   hidden: boolean;
-  /** A functional chain groups individual endpoints (this system producing/consuming this topic), not whole topics. */
-  chainId: string | null;
+  /**
+   * Functional chains this endpoint (this system producing/consuming this topic) takes part in.
+   * Chains group individual endpoints, not whole topics, and an endpoint can be in several chains.
+   */
+  chainIds: string[];
 }
 
 export interface Group {
@@ -95,22 +98,23 @@ export function normalizeModel(raw: unknown): Model {
     centre?: Partial<Centre>;
     systems?: Partial<SystemNode>[];
     topics?: (Partial<Topic> & { chainId?: string | null })[];
-    interactions?: Partial<Interaction>[];
+    interactions?: (Partial<Interaction> & { chainId?: string | null })[];
     groups?: Partial<Group>[];
   };
   const base = emptyModel();
   const sysDefaults: Omit<SystemNode, 'id' | 'name'> = { kind: 'system', side: 'W', parentId: null, description: '', owner: '', properties: [], hidden: false };
   const topicDefaults: Omit<Topic, 'id' | 'name'> = { description: '', owner: '', format: '', properties: [], bundleId: null, hidden: false };
-  // Older files stored the chain on the topic: move it onto each of the topic's endpoints.
+  // Older files stored one chain on the topic (v0.1), then one chain per endpoint (v0.2–0.5): convert both to `chainIds`.
   const legacyChain = new Map((m.topics ?? []).filter((t) => t.id && t.chainId).map((t) => [t.id!, t.chainId!]));
   return {
     version: 1,
     centre: { ...base.centre, ...(m.centre ?? {}), id: 'centre' },
     systems: (m.systems ?? []).map((s) => ({ ...sysDefaults, ...s }) as SystemNode),
     topics: (m.topics ?? []).map(({ chainId: _legacy, ...t }) => ({ ...topicDefaults, ...t }) as Topic),
-    interactions: (m.interactions ?? []).map(
-      (i) => ({ hidden: false, chainId: (i.topicId && legacyChain.get(i.topicId)) || null, ...i }) as Interaction,
-    ),
+    interactions: (m.interactions ?? []).map(({ chainId, ...i }) => {
+      const legacy = chainId ?? (i.topicId && legacyChain.get(i.topicId)) ?? null;
+      return { hidden: false, ...i, chainIds: i.chainIds ?? (legacy ? [legacy] : []) } as Interaction;
+    }),
     groups: (m.groups ?? []).map((g) => ({ description: '', color: '#6366f1', ...g }) as Group),
   };
 }

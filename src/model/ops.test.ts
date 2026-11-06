@@ -62,14 +62,17 @@ describe('duplicate', () => {
     const id = duplicateTopic(m, 't5')!;
     const copies = m.interactions.filter((i) => i.topicId === id);
     expect(copies.length).toBe(m.interactions.filter((i) => i.topicId === 't5').length);
-    expect(copies.every((i) => i.chainId === null)).toBe(true);
+    expect(copies.every((i) => i.chainIds.length === 0)).toBe(true);
   });
 
-  it('duplicates a group without members', () => {
+  it('duplicates a chain with its endpoints, and a bundle without members', () => {
     const m = sampleModel();
     const id = duplicateGroup(m, 'c-order')!;
     expect(m.groups.find((g) => g.id === id)).toMatchObject({ type: 'chain', name: 'Order flow (copy)' });
-    expect(m.interactions.some((i) => i.chainId === id)).toBe(false);
+    const members = (c: string) => m.interactions.filter((i) => i.chainIds.includes(c)).map((i) => i.id);
+    expect(members(id)).toEqual(members('c-order'));
+    const b = duplicateGroup(m, 'b-ref')!;
+    expect(m.topics.some((t) => t.bundleId === b)).toBe(false);
   });
 });
 

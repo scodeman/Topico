@@ -92,7 +92,6 @@ textarea { resize: vertical; }
 .help ul { padding-left: 18px; line-height: 1.6; }
 .dot.inline { display: inline-block; margin-left: 6px; vertical-align: middle; }
 .endpoint-fields { padding: 8px 8px 0; background: #f8fafc; border-bottom: 1px dashed var(--line); }
-.chain-select-compact select { font-size: 11px; padding: 1px 4px; max-width: 110px; }
 .chain-topic { margin: 6px 0 8px; }
 .chain-topic-name { font-weight: 600; font-size: 12px; }
 .chain-topic .check { margin-left: 8px; }
@@ -114,3 +113,8 @@ textarea { resize: vertical; }
 .cm-hint { color: #94a3b8; font-size: 11px; }
 .sort-btn { font-size: 11px; padding: 2px 6px; color: var(--muted); font-variant-numeric: tabular-nums; }
 .sort-btn.on { color: var(--ink); border-color: #94a3b8; }
+.chain-picker { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+.chain-picker select { font-size: 11px; padding: 1px 4px; max-width: 130px; }
+.chain-picker.compact { flex: 1; justify-content: flex-end; }
+.chain-chip { display: inline-flex; align-items: center; gap: 2px; border: 1px solid; border-radius: 10px; padding: 0 2px 0 8px; font-size: 11px; }
+.chain-chip button { border: none; background: none; padding: 0 4px; font-size: 12px; line-height: 1; }

@@ -55,7 +55,8 @@ export function DiagramSvg(p: DiagramProps) {
   const move = (r: Rect): CSSProperties | undefined => (animate ? { transform: `translate(${r.x}px,${r.y}px)`, transition: t } : undefined);
   const at = (r: Rect) => (animate ? undefined : `translate(${r.x},${r.y})`);
   const b = layout.bounds;
-  const edgeColors = [...new Set(layout.edges.map((e) => chainColor(e.chainId) ?? COLORS.muted))];
+  const chainColors = (ids: string[]) => ids.map((c) => chainColor(c)).filter((c): c is string => !!c);
+  const edgeColors = [...new Set(layout.edges.map((e) => chainColors(e.chainIds)[0] ?? COLORS.muted))];
 
   const node = (n: NodeGeom) => {
     const sel = p.selectedNodes?.has(n.id);
@@ -91,7 +92,7 @@ export function DiagramSvg(p: DiagramProps) {
   const tab = (tg: TabGeom) => {
     const topic = vm.topics[tg.topicId];
     const sel = p.selectedTopics?.has(tg.topicId);
-    const fill = chainColor(tg.chainIds[0]);
+    const fills = chainColors(tg.chainIds);
     const { w, h } = tg.rect;
     const label = truncate(topic?.name ?? tg.topicId, 15);
     return (
@@ -106,7 +107,14 @@ export function DiagramSvg(p: DiagramProps) {
       >
         <title>{`${topic?.name ?? tg.topicId} — ${tg.role}${tg.chainIds.length ? ` — chain: ${tg.chainIds.map((c) => groups.find((g) => g.id === c)?.name).join(', ')}` : ''}`}</title>
         <rect width={w} height={h} fill={COLORS.nodeFill} stroke={sel ? COLORS.accent : COLORS.ink} strokeWidth={sel ? 2.4 : 1} />
-        {fill && <rect width={w} height={h} fill={fill} fillOpacity={0.22} />}
+        {/* One band per chain, across the tab's thickness. */}
+        {fills.map((f, i) =>
+          tg.vertical ? (
+            <rect key={f} x={(w / fills.length) * i} width={w / fills.length} height={h} fill={f} fillOpacity={0.25} />
+          ) : (
+            <rect key={f} y={(h / fills.length) * i} width={w} height={h / fills.length} fill={f} fillOpacity={0.25} />
+          ),
+        )}
         {topic?.isGroup && <rect x={2} y={2} width={w - 4} height={h - 4} fill="none" stroke={COLORS.ink} strokeDasharray="2 2" strokeWidth={0.8} />}
         <text
           x={w / 2}
@@ -170,18 +178,30 @@ export function DiagramSvg(p: DiagramProps) {
 
       <g fill="none">
         {layout.edges.map((e) => {
-          const c = chainColor(e.chainId) ?? COLORS.muted;
+          const colors = chainColors(e.chainIds);
+          const c = colors[0] ?? COLORS.muted;
           const hit = edgeHit(e);
+          const width = active && hit ? 2.2 : colors.length ? 1.8 : 1.3;
+          const style = animate ? ({ d: `path("${e.d}")`, transition: 'd .35s ease, opacity .2s' } as CSSProperties) : undefined;
+          const opacity = (hit ? 1 : 0.12) * 0.9;
+          const DASH = 8;
           return (
-            <path
-              key={e.id}
-              d={e.d}
-              stroke={c}
-              strokeWidth={active && hit ? 2.2 : e.chainId ? 1.8 : 1.3}
-              markerEnd={`url(#${markerId(c)})`}
-              opacity={(hit ? 1 : 0.12) * 0.9}
-              style={animate ? { d: `path("${e.d}")`, transition: 'd .35s ease, opacity .2s' } as CSSProperties : undefined}
-            />
+            <g key={e.id} opacity={opacity}>
+              <title>{e.chainIds.length ? `Chains: ${e.chainIds.map((x) => groups.find((g) => g.id === x)?.name).join(', ')}` : ''}</title>
+              <path d={e.d} stroke={c} strokeWidth={width} markerEnd={`url(#${markerId(c)})`} style={style} />
+              {/* Shared by several chains: overlay alternating dashes in each further chain colour. */}
+              {colors.slice(1).map((col, i) => (
+                <path
+                  key={col}
+                  d={e.d}
+                  stroke={col}
+                  strokeWidth={width}
+                  strokeDasharray={`${DASH} ${DASH * colors.length - DASH}`}
+                  strokeDashoffset={-DASH * (i + 1)}
+                  style={style}
+                />
+              ))}
+            </g>
           );
         })}
         {p.showStubs &&

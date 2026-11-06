@@ -192,7 +192,7 @@ export const useStore = create<Store>()(
       addInteraction: (systemId, topicId, direction) =>
         set((s) => {
           const exists = s.model.interactions.some((i) => i.systemId === systemId && i.topicId === topicId && i.direction === direction);
-          if (!exists) s.model.interactions.push({ id: newId('i'), systemId, topicId, direction, hidden: false, chainId: null });
+          if (!exists) s.model.interactions.push({ id: newId('i'), systemId, topicId, direction, hidden: false, chainIds: [] });
         }),
       updateInteraction: (id, patch) => set((s) => void Object.assign(s.model.interactions.find((x) => x.id === id) ?? {}, patch)),
       deleteInteraction: (id) => set((s) => void (s.model.interactions = s.model.interactions.filter((x) => x.id !== id))),
@@ -223,7 +223,7 @@ export const useStore = create<Store>()(
         set((s) => {
           s.model.groups = s.model.groups.filter((g) => g.id !== id);
           for (const t of s.model.topics) if (t.bundleId === id) t.bundleId = null;
-          for (const i of s.model.interactions) if (i.chainId === id) i.chainId = null;
+          for (const i of s.model.interactions) i.chainIds = i.chainIds.filter((c) => c !== id);
           s.ui.filterTopics = s.ui.filterTopics.filter((x) => x !== `grp:${id}`);
           s.ui.focus = null;
         }),
@@ -238,8 +238,9 @@ export const useStore = create<Store>()(
             }
           } else {
             for (const i of s.model.interactions) {
-              if (memberIds.includes(i.id)) i.chainId = groupId;
-              else if (i.chainId === groupId) i.chainId = null;
+              const member = i.chainIds.includes(groupId);
+              if (memberIds.includes(i.id) && !member) i.chainIds.push(groupId);
+              else if (!memberIds.includes(i.id) && member) i.chainIds = i.chainIds.filter((c) => c !== groupId);
             }
           }
         }),

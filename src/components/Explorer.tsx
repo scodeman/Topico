@@ -234,7 +234,7 @@ export function Explorer() {
               const count =
                 type === 'bundle'
                   ? `${model.topics.filter((t) => t.bundleId === g.id).length} topics`
-                  : `${model.interactions.filter((i) => i.chainId === g.id).length} endpoints`;
+                  : `${model.interactions.filter((i) => i.chainIds.includes(g.id)).length} endpoints`;
               const filterId = groupTopicId(g.id);
               return (
                 <Row

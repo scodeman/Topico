@@ -80,20 +80,22 @@ export function duplicateTopic(m: Model, id: string): string | null {
   const copy = { ...clone(src), id: newId('t'), name: copyName(src.name) };
   m.topics.splice(m.topics.indexOf(src) + 1, 0, copy);
   for (const i of m.interactions.filter((x) => x.topicId === id)) {
-    m.interactions.push({ ...clone(i), id: newId('i'), topicId: copy.id, chainId: null });
+    m.interactions.push({ ...clone(i), id: newId('i'), topicId: copy.id, chainIds: [] });
   }
   return copy.id;
 }
 
 /**
- * Duplicate a bundle or chain (name, colour, description). Members are not copied:
- * a topic is in at most one bundle and an endpoint in at most one chain.
+ * Duplicate a bundle or chain (name, colour, description).
+ * A chain copy has the same endpoints (an endpoint can be in several chains).
+ * A bundle copy is empty: a topic is in at most one bundle.
  */
 export function duplicateGroup(m: Model, id: string): string | null {
   const src = m.groups.find((g) => g.id === id);
   if (!src) return null;
   const copy = { ...clone(src), id: newId(src.type === 'bundle' ? 'b' : 'c'), name: copyName(src.name) };
   m.groups.splice(m.groups.indexOf(src) + 1, 0, copy);
+  if (src.type === 'chain') for (const i of m.interactions) if (i.chainIds.includes(id)) i.chainIds.push(copy.id);
   return copy.id;
 }
 

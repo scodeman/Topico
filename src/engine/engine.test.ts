@@ -74,8 +74,41 @@ describe('functional chains (endpoint membership)', () => {
   it('colours only the arrows whose two endpoints are in the chain', () => {
     const vm = view();
     const t5 = vm.edges.filter((e) => e.topicIds.includes('t5'));
-    expect(t5.find((e) => e.to.nodeId === 'xw1')!.chainId).toBe('c-order');
-    expect(t5.find((e) => e.to.nodeId === 's1')!.chainId).toBeNull();
+    expect(t5.find((e) => e.to.nodeId === 'xw1')!.chainIds).toEqual(['c-order']);
+    expect(t5.find((e) => e.to.nodeId === 's1')!.chainIds).toEqual([]);
+  });
+
+  it('lets an endpoint take part in several chains', () => {
+    // SOUTH SYS 1 publishing TOPIC 9 is in Billing (towards EAST SYS 12) and Settlement (towards EAST SYS 1).
+    const vm = view();
+    const t9 = (to: string) => vm.edges.find((e) => e.topicIds.includes('t9') && e.from.nodeId === 's1' && e.to.nodeId === to)!;
+    expect(t9('e12').chainIds).toEqual(['c-billing']);
+    expect(t9('e1').chainIds).toEqual(['c-settle']);
+    expect(vm.nodes.s1.tabs.find((t) => t.topicId === 't9')!.chainIds.sort()).toEqual(['c-billing', 'c-settle']);
+  });
+
+  it('colours an arrow with every chain shared by both ends', () => {
+    const m = sampleModel();
+    m.interactions.find((i) => i.id === 'i-e12-c-9')!.chainIds.push('c-settle');
+    const vm = computeView(m, base);
+    const e = vm.edges.find((x) => x.topicIds.includes('t9') && x.to.nodeId === 'e12')!;
+    expect(e.chainIds.sort()).toEqual(['c-billing', 'c-settle']);
+  });
+
+  it('focusing one chain keeps only that chain, even for a shared endpoint', () => {
+    const vm = view({ filterTopics: [groupTopicId('c-settle')] });
+    expect(Object.keys(vm.nodes).sort()).toEqual(['e1', 's1']);
+  });
+
+  it('collapsing by chain shows a shared endpoint in each of its chain tabs', () => {
+    const vm = view({ collapseBy: 'chain' });
+    const billing = groupTopicId('c-billing');
+    const settle = groupTopicId('c-settle');
+    expect(vm.nodes.s1.tabs.map((t) => t.topicId)).toEqual(expect.arrayContaining([billing, settle]));
+    const fromS1 = vm.edges.filter((e) => e.from.nodeId === 's1' && e.from.tabId.startsWith('grp:c-'));
+    expect(fromS1.map((e) => `${e.from.tabId}>${e.to.nodeId}:${e.to.tabId}`).sort()).toEqual(
+      [`${billing}>e12:${billing}`, `${settle}>e1:${settle}`].sort(),
+    );
   });
 
   it('focusing a chain shows only its endpoints, not every endpoint of its topics', () => {
@@ -97,13 +130,19 @@ describe('functional chains (endpoint membership)', () => {
     expect(vm.edges.some((e) => e.from.nodeId === 'n1' && e.from.tabId === order && e.to.nodeId === 's1' && e.to.tabId === 't5')).toBe(true);
   });
 
+  it('migrates single-chain endpoints (v0.2–0.5) to a chain list', () => {
+    const m = normalizeModel({ interactions: [{ id: 'i1', systemId: 's', topicId: 't', direction: 'produce', chainId: 'c' }, { id: 'i2', systemId: 's', topicId: 't', direction: 'consume', chainId: null }] });
+    expect(m.interactions.map((i) => i.chainIds)).toEqual([['c'], []]);
+    expect('chainId' in m.interactions[0]).toBe(false);
+  });
+
   it('migrates topic-level chains from older files onto every endpoint of the topic', () => {
     const m = normalizeModel({
       topics: [{ id: 't', name: 'T', chainId: 'c' }],
       interactions: [{ id: 'i1', systemId: 's', topicId: 't', direction: 'produce' }],
       groups: [{ id: 'c', name: 'C', type: 'chain' }],
     });
-    expect(m.interactions[0].chainId).toBe('c');
+    expect(m.interactions[0].chainIds).toEqual(['c']);
     expect('chainId' in m.topics[0]).toBe(false);
   });
 });
