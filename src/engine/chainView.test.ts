@@ -65,7 +65,7 @@ describe('computeChainLayout', () => {
     m.systems.find((s) => s.id === 'e1')!.hidden = true;
     const l = computeChainLayout(m, 'c-settle')!;
     expect(l.nodes.map((n) => n.id)).toEqual(['s1']);
-    m.groups.push({ id: 'c-none', name: 'Empty', type: 'chain', color: '#000', description: '', hidden: false });
+    m.groups.push({ id: 'c-none', name: 'Empty', type: 'chain', color: '#000', description: '', hidden: false, sequence: [] });
     expect(computeChainLayout(m, 'c-none')!.empty).toBe(true);
     expect(computeChainLayout(m, 'b-ref')).toBeNull();
   });

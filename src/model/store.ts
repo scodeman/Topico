@@ -45,6 +45,8 @@ export interface UiState {
   chainView: string | null;
   /** Main canvas: the broker diagram or the System of System view. */
   view: 'diagram' | 'sos';
+  /** Chain sequence being animated (step is 1-based), or null. */
+  animation: { chainId: string; step: number; playing: boolean } | null;
 }
 
 const GROUP_COLORS = ['#0ea5e9', '#f97316', '#a855f7', '#22c55e', '#ef4444', '#eab308', '#14b8a6', '#ec4899'];
@@ -95,6 +97,7 @@ const initialUi: UiState = {
   hoverTopic: null,
   chainView: null,
   view: 'diagram',
+  animation: null,
 };
 
 const toggle = (list: string[], id: string) => (list.includes(id) ? list.filter((x) => x !== id) : [...list, id]);
@@ -225,6 +228,7 @@ export const useStore = create<Store>()(
             color: GROUP_COLORS[n % GROUP_COLORS.length],
             description: '',
             hidden: false,
+            sequence: [],
           });
           s.ui.focus = { kind: 'group', id };
         });
@@ -244,6 +248,7 @@ export const useStore = create<Store>()(
           for (const i of s.model.interactions) i.chainIds = i.chainIds.filter((c) => c !== id);
           s.ui.filterTopics = s.ui.filterTopics.filter((x) => x !== `grp:${id}`);
           if (s.ui.chainView === id) s.ui.chainView = null;
+          if (s.ui.animation?.chainId === id) s.ui.animation = null;
           s.ui.focus = null;
         }),
       setGroupMembers: (groupId, memberIds) =>
@@ -290,7 +295,7 @@ export const useStore = create<Store>()(
     {
       name: 'topico',
       version: 1,
-      partialize: (s) => ({ model: s.model, ui: { ...s.ui, hoverTopic: null } }),
+      partialize: (s) => ({ model: s.model, ui: { ...s.ui, hoverTopic: null, animation: null } }),
       merge: (persisted, current) => {
         const p = persisted as Partial<Store> | undefined;
         const { topicSort: _dropped, ...ui } = (p?.ui ?? {}) as Partial<UiState> & { topicSort?: unknown };

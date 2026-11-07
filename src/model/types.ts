@@ -75,6 +75,11 @@ export interface Group {
   description: string;
   /** Hides the group's colouring only (bundle outline, chain colours): its topics and endpoints stay, drawn individually. */
   hidden: boolean;
+  /**
+   * Chains only: numbered sequence of steps. Each step lists one or more chain links
+   * (`<producer interaction id>><consumer interaction id>`, see model/chainLinks.ts); a link may appear in several steps.
+   */
+  sequence: string[][];
 }
 
 /** What the SoS view's callouts show for each outer system. */
@@ -170,7 +175,7 @@ export function normalizeModel(raw: unknown): Model {
       const legacy = chainId ?? (i.topicId && legacyChain.get(i.topicId)) ?? null;
       return { hidden: false, ...i, chainIds: i.chainIds ?? (legacy ? [legacy] : []) } as Interaction;
     }),
-    groups: (m.groups ?? []).map((g) => ({ description: '', color: '#6366f1', hidden: false, ...g }) as Group),
+    groups: (m.groups ?? []).map((g) => ({ description: '', color: '#6366f1', hidden: false, sequence: [], ...g }) as Group),
     sos: { ...sos, ...(m.sos ?? {}), callouts: { ...sos.callouts, ...(m.sos?.callouts ?? {}) } },
   };
 }

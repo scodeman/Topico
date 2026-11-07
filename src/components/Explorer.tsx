@@ -250,6 +250,21 @@ export function Explorer() {
                   key={g.id}
                   extra={
                     type === 'chain' && (
+                      <>
+                      <button
+                        className={`view-btn${ui.animation?.chainId === g.id ? ' on' : ''}`}
+                        disabled={!g.sequence.length}
+                        onClick={() =>
+                          st().setUi(
+                            ui.animation?.chainId === g.id
+                              ? { animation: null }
+                              : { animation: { chainId: g.id, step: 1, playing: true }, view: 'diagram' },
+                          )
+                        }
+                        title={g.sequence.length ? (ui.animation?.chainId === g.id ? 'Stop the animation' : 'Animate the sequence') : 'Define a sequence in the chain pane first'}
+                      >
+                        {ui.animation?.chainId === g.id ? '■' : '▶'}
+                      </button>
                       <button
                         className={`view-btn${viewing ? ' on' : ''}`}
                         onClick={() => st().setUi({ chainView: viewing ? null : g.id, view: 'diagram' })}
@@ -258,6 +273,7 @@ export function Explorer() {
                       >
                         {viewing ? 'Viewing' : 'View'}
                       </button>
+                      </>
                     )
                   }
                   depth={0}

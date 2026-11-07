@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Version | 0.14 |
+| Version | 0.15 |
 | Last updated | 2026-11-07 |
 | Reference material | [`images/`](images/) (hand-drawn target views), [`Topico.drawio`](Topico.drawio) (source sketch) |
 
@@ -120,6 +120,9 @@ The built-in sample model (toolbar button **Sample**) recreates ALL.png.
 | GRP-10 | In the chain view, systems sit around the tube on their border: North above, South below, West left, East right. Arrows go from producers into the bar and from the bar to consumers. | Done (tested) | Upstream systems and ETLs stack outside their parent, with a relay arrow labelled with the topic. West/East systems are ordered by the bars they connect to, so their arrows do not cross. Clicking a system or bar opens its details, and hovering a bar highlights its arrows. |
 | GRP-11 | The chain view can be exported as SVG and draw.io. | Done | The broker tube is draw.io's horizontal cylinder ("Direct data") shape. The draw.io output was checked to be well formed but not yet opened in draw.io. |
 | GRP-12 | The colouring of a bundle or chain can be hidden or shown, like topics and systems, from the left panel or the legend. | Done (tested) | ●/◌ on the group's row in the left panel, a click on the group in the canvas legend, or "Hide colouring" in the group pane. A hidden bundle loses its outline. A hidden chain's tabs and arrows go back to the default colour, also in the chain view and the exports. Topics, endpoints and flows stay, and grouping (collapse) still works. Hidden groups are struck through in the legend. |
+| GRP-13 | A chain has a numbered **sequence**: each step holds one or more of the chain's links, and a link can appear in several steps. | Done (tested) | A **link** is one hop of a topic between two endpoints of the chain: producer → consumer through the broker or a parent system, or a relay between a system and its upstream system. The chain pane's Sequence section adds, removes and reorders steps, and adds or removes links in each step. **Auto-fill** proposes an order following the flow: a link comes one step after the links that bring data to the system it starts from. The sample chains come with that sequence. Links that no longer exist are ignored. |
+| GRP-14 | An **animate** mode plays a chain's sequence on the diagram, showing the chain activating progressively. | Done (tested) | Started from ▶ on the chain row in the left panel, or "▶ Animate" in the chain pane. It plays on the main diagram and in the chain (tube) view. The current step's links are drawn thick with a moving dash, earlier steps stay lit, later steps are faded, and other arrows almost disappear. Each link shows its step number. A player bar offers first, previous, play/pause, next and stop, and shows the current step's links. Playback loops every 1.6 s. Not available in the SoS view, where links are merged per system. Checked in Chrome. |
+| GRP-15 | The draw.io export keeps the animation. | Done (tested) | While animating, the draw.io export contains an overview page with every link numbered and the steps listed, plus one page per step. On each step page, the current links use draw.io's flow animation (moving dashes), earlier ones stay lit and later ones are faded, with a caption listing the step's links. Flip through the pages to replay the chain. The SVG export captures the current step, including the moving dash. Well-formed XML, not yet opened in draw.io. |
 | GRP-07 | Files saved by earlier versions still load. | Done (tested) | A chain stored on a topic (v0.1) is copied to every endpoint of that topic. A single chain stored on an endpoint (v0.2–0.5) becomes a one-item chain list. |
 
 ### 4.6 Automatic layout
@@ -240,6 +243,7 @@ The original request did not settle these points. They were decided during the i
     - When the broker is shown, inside lines go through it (SOS-10). Lines to outer systems still stop at the SoS box border, since they enter and leave the SoS through the broker anyway.
     - Only outer systems have callouts, as in SOS.png.
     - The chain view, when on, takes precedence over the SoS view.
+16. **Animation in draw.io uses one page per step.** draw.io has no timeline to animate a single page, so the export uses its flow animation (moving dashes) on the current step's links, with one page per step. Moving through the pages replays the sequence.
 
 ## 8. Open questions
 
@@ -253,6 +257,7 @@ The original request did not settle these points. They were decided during the i
 | Date | Version | Change |
 |---|---|---|
 | 2026-11-07 | 0.1 | Initial build covering §4.1–4.6, §4.8 and §4.10. Reference material moved to `docs/spec/`. |
+| 2026-11-07 | 0.15 | Chain sequences, animate mode, and animated draw.io export (GRP-13 to GRP-15). |
 | 2026-11-07 | 0.14 | Automated dependency updates with GitHub Dependabot (NFR-07). |
 | 2026-11-07 | 0.13 | Bundle and chain colouring can be hidden from the left panel, the legend or the group pane (GRP-12). The content stays. |
 | 2026-11-07 | 0.12 | SoS defaults: only the broker inside, systems outside, ETLs not shown, callouts showing notes (SOS-01). Flows between outer systems are drawn through the box when the broker is in it. Every sample system has a note. |

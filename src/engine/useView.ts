@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import { useStore } from '../model/store';
+import { computeAnimation } from './animation';
 import { computeChainLayout } from './chainView';
 import { layoutView } from './layout';
 import { computeSosLayout } from './sosView';
@@ -24,5 +25,10 @@ export function useView() {
   const chainLayout = useMemo(() => (ui.chainView ? computeChainLayout(model, ui.chainView) : null), [model, ui.chainView]);
   // System of System view, when selected in the toolbar (the chain view takes precedence).
   const sosLayout = useMemo(() => (!ui.chainView && ui.view === 'sos' ? computeSosLayout(model) : null), [model, ui.chainView, ui.view]);
-  return { model, ui, vm, layout, chainLayout, sosLayout };
+  // Chain sequence being animated, mapped onto the diagram's and the tube view's arrows.
+  const anim = useMemo(
+    () => (ui.animation && !sosLayout ? computeAnimation(model, vm, ui.animation.chainId, ui.animation.step) : null),
+    [model, vm, ui.animation, sosLayout],
+  );
+  return { model, ui, vm, layout, chainLayout, sosLayout, anim };
 }

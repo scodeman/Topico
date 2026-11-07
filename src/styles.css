@@ -138,3 +138,22 @@ textarea { resize: vertical; }
 .legend-row { border: none; background: none; padding: 1px 2px; font-size: 11px; text-align: left; justify-content: flex-start; }
 .legend-row:hover { background: #f1f5f9; }
 .legend-row.is-hidden { opacity: 0.45; text-decoration: line-through; }
+.anim-bar { position: absolute; left: 50%; bottom: 12px; transform: translateX(-50%); background: #fff; border: 2px solid; border-radius: 10px; padding: 6px 10px; box-shadow: 0 6px 20px rgba(15, 23, 42, .15); width: 460px; max-width: calc(100% - 24px); box-sizing: border-box; }
+.anim-head strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.anim-step-no { flex: none; font-size: 13px; font-variant-numeric: tabular-nums; }
+.anim-step-no b { font-size: 16px; }
+.anim-ticker { overflow: hidden; white-space: nowrap; font-size: 12px; margin-top: 4px; color: var(--ink); }
+.anim-ticker span { display: inline-block; }
+.anim-ticker span.scrolling { animation-name: anim-ticker; animation-timing-function: linear; animation-iteration-count: infinite; animation-direction: alternate; }
+@keyframes anim-ticker { 0%, 15% { transform: translateX(0); } 85%, 100% { transform: translateX(var(--shift)); } }
+.anim-head { display: flex; align-items: center; gap: 8px; }
+.anim-controls { margin-left: auto; display: flex; gap: 4px; flex: none; }
+.anim-controls button { padding: 2px 8px; font-size: 12px; }
+.anim-play { min-width: 34px; }
+.seq-step { border: 1px solid var(--line); border-radius: 8px; background: #fff; padding: 6px 8px; margin: 6px 0; }
+.seq-head { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
+.seq-num { display: inline-grid; place-items: center; min-width: 20px; height: 20px; border-radius: 10px; background: var(--ink); color: #fff; font-size: 11px; font-weight: 700; }
+.seq-actions { margin-left: auto; }
+.seq-link { display: flex; justify-content: space-between; align-items: center; font-size: 12px; padding: 2px 0 2px 26px; }
+.seq-step select { width: 100%; font-size: 11px; margin-top: 2px; }
+.btn-row button.on { background: var(--ink); color: #fff; }

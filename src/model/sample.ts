@@ -1,3 +1,4 @@
+import { autoSequence } from './chainLinks';
 import { defaultSosRole, defaultSosSettings, type Direction, type Model, type NodeKind, type Side, type SystemNode, type Topic } from './types';
 
 /** Recreates the landscape sketched in docs/spec/images/ALL.png. */
@@ -93,7 +94,7 @@ export function sampleModel(): Model {
     }),
   );
 
-  return {
+  const model: Model = {
     version: 1,
     centre: { id: 'centre', name: 'CENTER SYS', description: 'Central brokering system', properties: [], sos: 'inner' },
     sos: defaultSosSettings(),
@@ -101,10 +102,13 @@ export function sampleModel(): Model {
     topics,
     interactions,
     groups: [
-      { id: bundleRef, name: 'Reference data', type: 'bundle', color: '#0ea5e9', description: '', hidden: false },
-      { id: chainOrder, name: 'Order flow', type: 'chain', color: '#f97316', description: '', hidden: false },
-      { id: chainBilling, name: 'Billing', type: 'chain', color: '#a855f7', description: '', hidden: false },
-      { id: chainSettle, name: 'Settlement', type: 'chain', color: '#16a34a', description: '', hidden: false },
+      { id: bundleRef, name: 'Reference data', type: 'bundle', color: '#0ea5e9', description: '', hidden: false, sequence: [] },
+      { id: chainOrder, name: 'Order flow', type: 'chain', color: '#f97316', description: '', hidden: false, sequence: [] },
+      { id: chainBilling, name: 'Billing', type: 'chain', color: '#a855f7', description: '', hidden: false, sequence: [] },
+      { id: chainSettle, name: 'Settlement', type: 'chain', color: '#16a34a', description: '', hidden: false, sequence: [] },
     ],
   };
+  // Each chain comes with the sequence proposed by "Auto-fill", ready to animate.
+  for (const g of model.groups) if (g.type === 'chain') g.sequence = autoSequence(model, g.id);
+  return model;
 }

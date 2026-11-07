@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { autoSequence, chainLinks, chainSequence, linkLabel } from '../model/chainLinks';
 import { useStore } from '../model/store';
 import {
   SIDES,
@@ -312,6 +313,7 @@ function GroupPane({ id }: { id: string }) {
         <button onClick={() => st().filterOn('topic', `grp:${id}`, false)}>Focus view</button>
       </div>
       {isBundle ? <BundleMembers groupId={id} /> : <ChainMembers groupId={id} />}
+      {!isBundle && <SequenceEditor chainId={id} />}
       <button className="danger" onClick={() => confirm(`Delete ${g.name}?`) && st().deleteGroup(id)}>Delete group</button>
     </div>
   );
@@ -376,6 +378,79 @@ function ChainMembers({ groupId }: { groupId: string }) {
           </div>
         );
       })}
+    </section>
+  );
+}
+
+/** Numbered sequence of a chain: each step holds one or more of the chain's links. */
+function SequenceEditor({ chainId }: { chainId: string }) {
+  const model = useStore((s) => s.model);
+  const ui = useStore((s) => s.ui);
+  const st = useStore.getState;
+  const links = chainLinks(model, chainId);
+  const labelOf = new Map(links.map((l) => [l.id, linkLabel(model, l)]));
+  const seq = chainSequence(model, chainId);
+  const save = (sequence: string[][]) => st().updateGroup(chainId, { sequence });
+  const animating = ui.animation?.chainId === chainId;
+  const move = (i: number, d: number) => {
+    const next = [...seq];
+    [next[i], next[i + d]] = [next[i + d], next[i]];
+    save(next);
+  };
+  return (
+    <section className="subsection">
+      <h4>
+        Sequence <span className="muted">({seq.length} steps)</span>
+      </h4>
+      <p className="muted small">Number the chain's links in the order data flows. A step can hold several links, and a link can appear in several steps.</p>
+      {links.length === 0 && <p className="muted small">Add endpoints to this chain first: links appear when a producer and a consumer of the same topic are in the chain.</p>}
+      {seq.map((step, i) => (
+        <div key={i} className="seq-step">
+          <div className="seq-head">
+            <span className="seq-num">{i + 1}</span>
+            <span className="seq-actions">
+              <button className="link" disabled={i === 0} onClick={() => move(i, -1)} title="Move up">↑</button>
+              <button className="link" disabled={i === seq.length - 1} onClick={() => move(i, 1)} title="Move down">↓</button>
+              <button className="link danger" onClick={() => save(seq.filter((_, j) => j !== i))} title="Remove step">×</button>
+            </span>
+          </div>
+          {step.map((lid) => (
+            <div key={lid} className="seq-link">
+              {labelOf.get(lid)}
+              <button className="link danger" onClick={() => save(seq.map((s, j) => (j === i ? s.filter((x) => x !== lid) : s)))} title="Remove from step">×</button>
+            </div>
+          ))}
+          <select
+            value=""
+            onChange={(e) => e.target.value && save(seq.map((s, j) => (j === i ? [...s, e.target.value] : s)))}
+            disabled={links.every((l) => step.includes(l.id))}
+          >
+            <option value="">+ add a link to step {i + 1}…</option>
+            {links.filter((l) => !step.includes(l.id)).map((l) => (
+              <option key={l.id} value={l.id}>{labelOf.get(l.id)}</option>
+            ))}
+          </select>
+        </div>
+      ))}
+      <div className="btn-row">
+        <button disabled={!links.length} onClick={() => save([...seq, [links[0].id]])} title="Add a step (starts with the first link; change it in the step)">+ Step</button>
+        <button
+          disabled={!links.length}
+          onClick={() => (!seq.length || confirm('Replace the sequence with one following the flow?')) && save(autoSequence(model, chainId))}
+          title="Propose steps following the flow: a link comes after the links that bring data to its system"
+        >
+          Auto-fill
+        </button>
+        <button disabled={!seq.length} onClick={() => confirm('Clear the sequence?') && save([])}>Clear</button>
+        <button
+          className={animating ? 'on' : ''}
+          disabled={!seq.length}
+          onClick={() => st().setUi(animating ? { animation: null } : { animation: { chainId, step: 1, playing: true }, view: 'diagram' })}
+          title="Play the sequence on the diagram (and in the chain view)"
+        >
+          {animating ? 'Stop animation' : '▶ Animate'}
+        </button>
+      </div>
     </section>
   );
 }

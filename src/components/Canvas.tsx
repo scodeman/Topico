@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } fr
 import { useView } from '../engine/useView';
 import { CENTRE_ID } from '../model/types';
 import { useStore } from '../model/store';
+import { AnimationBar } from './AnimationBar';
 import { ChainSvg, type ChainHandlers } from './ChainSvg';
 import { DiagramSvg, type DiagramHandlers } from './DiagramSvg';
 import { SosBar } from './SosBar';
@@ -15,7 +16,7 @@ interface Box {
 }
 
 export function Canvas() {
-  const { model, ui, vm, layout, chainLayout, sosLayout } = useView();
+  const { model, ui, vm, layout, chainLayout, sosLayout, anim } = useView();
   const setFocus = useStore((s) => s.setFocus);
   const filterOn = useStore((s) => s.filterOn);
   const setUi = useStore((s) => s.setUi);
@@ -144,6 +145,7 @@ export function Canvas() {
       ) : chainLayout ? (
         <ChainSvg
           layout={chainLayout}
+          anim={anim ? { arrowSteps: anim.arrowSteps, current: anim.current } : null}
           selectedNodes={selectedNodes}
           selectedTopics={selectedTopics}
           hoverTopic={ui.hoverTopic}
@@ -165,6 +167,7 @@ export function Canvas() {
           selectedTopics={selectedTopics}
           hoverTopic={ui.hoverTopic}
           handlers={handlers}
+          anim={anim ? { edgeSteps: anim.edgeSteps, current: anim.current, color: anim.color } : null}
           animate
           svgProps={{
             viewBox: `${box.x} ${box.y} ${box.w} ${box.h}`,
@@ -179,7 +182,8 @@ export function Canvas() {
         <button onClick={() => setBox((bx) => zoom(bx, 0.8))} title="Zoom in">+</button>
         <button onClick={() => setBox((bx) => zoom(bx, 1.25))} title="Zoom out">−</button>
       </div>
-      {!sosLayout && <Legend />}
+      {!sosLayout && !anim && <Legend />}
+      {anim && <AnimationBar anim={anim} />}
       {!chainLayout && !sosLayout && Object.keys(vm.nodes).length === 0 && (
         <div className="empty-hint">Add systems and topics from the left panel to start drawing.</div>
       )}

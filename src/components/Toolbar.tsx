@@ -4,7 +4,7 @@ import { resetToEmpty, resetToSample, useStore } from '../model/store';
 import type { CollapseBy } from '../engine/view';
 
 export function Toolbar() {
-  const { model, ui, vm, layout, chainLayout, sosLayout } = useView();
+  const { model, ui, vm, layout, chainLayout, sosLayout, anim } = useView();
   const setUi = useStore((s) => s.setUi);
   const setModel = useStore((s) => s.setModel);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -20,21 +20,34 @@ export function Toolbar() {
   type Exporters = typeof import('../export/exporters');
   const withExporters = (fn: (ex: Exporters) => void) => () => void import('../export/exporters').then(fn);
   // Exports follow what the canvas shows: the broker-tube chain view when it is on.
+  // While a chain is animated: SVG captures the current step, draw.io gets one page per step.
+  const animSuffix = anim ? `-anim-${anim.chainName.toLowerCase().replace(/[^a-z0-9]+/g, '-')}` : '';
+  const drawioAnim = (steps: Map<string, number[]>) =>
+    anim ? { chainName: anim.chainName, color: anim.color, count: anim.count, stepLabels: anim.stepLabels, steps } : undefined;
   const exportSvg = withExporters((ex) =>
     ex.download(
-      `${base}${suffix}.svg`,
-      chainLayout ? ex.toChainSvg(chainLayout) : sosLayout ? ex.toSosSvg(sosLayout) : ex.toSvg(layout, vm, model.groups, ui.showStubs),
+      `${base}${suffix}${animSuffix}.svg`,
+      chainLayout
+        ? ex.toChainSvg(chainLayout, anim ? { arrowSteps: anim.arrowSteps, current: anim.current } : null)
+        : sosLayout
+          ? ex.toSosSvg(sosLayout)
+          : ex.toSvg(layout, vm, model.groups, ui.showStubs, anim ? { edgeSteps: anim.edgeSteps, current: anim.current, color: anim.color } : null),
       'image/svg+xml',
     ),
   );
   const exportDrawio = withExporters((ex) =>
     ex.download(
-      `${base}${suffix}.drawio`,
+      `${base}${suffix}${animSuffix}.drawio`,
       chainLayout
-        ? ex.toChainDrawio(chainLayout, { sketch: ui.sketchExport })
+        ? ex.toChainDrawio(chainLayout, { sketch: ui.sketchExport, anim: drawioAnim(anim?.arrowSteps ?? new Map()) })
         : sosLayout
           ? ex.toSosDrawio(sosLayout, { sketch: ui.sketchExport })
-          : ex.toDrawio(layout, vm, model.groups, { sketch: ui.sketchExport, showStubs: ui.showStubs, title: model.centre.name }),
+          : ex.toDrawio(layout, vm, model.groups, {
+              sketch: ui.sketchExport,
+              showStubs: ui.showStubs,
+              title: model.centre.name,
+              anim: drawioAnim(anim?.edgeSteps ?? new Map()),
+            }),
       'application/xml',
     ),
   );

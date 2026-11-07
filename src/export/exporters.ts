@@ -1,16 +1,17 @@
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { ChainSvg } from '../components/ChainSvg';
-import { DiagramSvg, COLORS } from '../components/DiagramSvg';
+import { ChainSvg, type ChainSvgProps } from '../components/ChainSvg';
+import { DiagramSvg, COLORS, type DiagramProps } from '../components/DiagramSvg';
 import { NOTE, SosSvg } from '../components/SosSvg';
 import type { SosLayout } from '../engine/sosView';
 import type { ChainEnd, ChainLayout } from '../engine/chainView';
+import { stepState } from '../engine/animation';
 import { labelArea, type Layout, type TabGeom } from '../engine/layout';
 import type { ViewModel } from '../engine/view';
 import type { Group, Model } from '../model/types';
 
-export function toSvg(layout: Layout, vm: ViewModel, groups: Group[], showStubs: boolean): string {
-  const body = renderToStaticMarkup(createElement(DiagramSvg, { layout, vm, groups, showStubs, standalone: true }));
+export function toSvg(layout: Layout, vm: ViewModel, groups: Group[], showStubs: boolean, anim?: DiagramProps['anim']): string {
+  const body = renderToStaticMarkup(createElement(DiagramSvg, { layout, vm, groups, showStubs, standalone: true, anim }));
   return `<?xml version="1.0" encoding="UTF-8"?>\n${body}`;
 }
 
@@ -19,8 +20,80 @@ const esc = (s: string) =>
 
 const SKETCH = 'sketch=1;curveFitting=1;jiggle=2;fontFamily=Architects Daughter;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DArchitects%2BDaughter;';
 
+/** Chain sequence to export as an animation: one page per step. */
+export interface DrawioAnim {
+  chainName: string;
+  color: string;
+  count: number;
+  stepLabels: string[][];
+  /** Steps of each arrow, keyed like the exported view's arrows (diagram edge ids or tube arrow ids). */
+  steps: Map<string, number[]>;
+}
+
+/** Pages of an export: one plain page, or an overview plus one page per step when animating. */
+function animPages(anim: DrawioAnim | undefined, title: string): { name: string; step?: number }[] {
+  if (!anim || !anim.count) return [{ name: title }];
+  return [{ name: `${anim.chainName} — sequence`, step: 0 }, ...anim.stepLabels.map((_, i) => ({ name: `${anim.chainName} — step ${i + 1}`, step: i + 1 }))];
+}
+
+/**
+ * Style of an arrow on an animation page. Step 0 is the overview (every sequenced arrow lit and numbered).
+ * On step k the current arrows use draw.io's flow animation (moving dashes), earlier ones stay lit, later ones fade.
+ */
+function animEdge(anim: DrawioAnim, id: string, step: number): { style: string; value: string } {
+  const steps = anim.steps.get(id);
+  const value = steps?.length ? steps.join(',') : '';
+  const label = `fontStyle=1;fontSize=11;fontColor=${anim.color};labelBackgroundColor=#ffffff;`;
+  if (step === 0) return steps?.length ? { style: `strokeColor=${anim.color};strokeWidth=2.5;${label}`, value } : { style: `strokeColor=${COLORS.muted};opacity=25;`, value: '' };
+  const state = stepState(steps, step);
+  const style = {
+    active: `strokeColor=${anim.color};strokeWidth=4;flowAnimation=1;${label}`,
+    done: `strokeColor=${anim.color};strokeWidth=2.5;opacity=85;${label}`,
+    pending: `strokeColor=${COLORS.muted};dashed=1;opacity=35;${label}`,
+    off: `strokeColor=${COLORS.muted};opacity=10;`,
+  }[state];
+  return { style, value: state === 'off' ? '' : value };
+}
+
+/** Caption of an animation page. */
+function animCaption(anim: DrawioAnim, step: number): string {
+  if (step === 0) return `<b>${esc(anim.chainName)}</b><br>${anim.stepLabels.map((ls, i) => `${i + 1}. ${ls.map(esc).join(' · ')}`).join('<br>')}`;
+  return `<b>${esc(anim.chainName)} — step ${step} / ${anim.count}</b><br>${anim.stepLabels[step - 1].map(esc).join('<br>')}`;
+}
+
+function wrapPages(pages: { name: string; cells: string[] }[], idPrefix: string): string {
+  return [
+    `<mxfile host="Topico">`,
+    ...pages.flatMap((pg, i) => [
+      `<diagram name="${esc(pg.name)}" id="${idPrefix}-${i}">`,
+      `<mxGraphModel grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="0" math="0" shadow="0">`,
+      `<root><mxCell id="0"/><mxCell id="1" parent="0"/>`,
+      ...pg.cells,
+      `</root></mxGraphModel></diagram>`,
+    ]),
+    `</mxfile>`,
+  ].join('\n');
+}
+
 /** draw.io / diagrams.net (mxGraph) XML for the current view. */
-export function toDrawio(layout: Layout, vm: ViewModel, groups: Group[], opts: { sketch: boolean; showStubs: boolean; title: string }): string {
+export function toDrawio(
+  layout: Layout,
+  vm: ViewModel,
+  groups: Group[],
+  opts: { sketch: boolean; showStubs: boolean; title: string; anim?: DrawioAnim },
+): string {
+  const pages = animPages(opts.anim, opts.title).map((pg) => ({ name: pg.name, cells: diagramCells(layout, vm, groups, opts, pg.step) }));
+  return wrapPages(pages, 'topico');
+}
+
+function diagramCells(
+  layout: Layout,
+  vm: ViewModel,
+  groups: Group[],
+  opts: { sketch: boolean; showStubs: boolean; anim?: DrawioAnim },
+  step: number | undefined,
+): string[] {
+  const anim = step !== undefined ? opts.anim : undefined;
   const sk = opts.sketch ? SKETCH : '';
   const colorOf = new Map(groups.filter((g) => !g.hidden).map((g) => [g.id, g.color]));
   const chainColor = (chainId: string | null | undefined) => (chainId && colorOf.get(chainId)) || undefined;
@@ -58,9 +131,10 @@ export function toDrawio(layout: Layout, vm: ViewModel, groups: Group[], opts: {
     const en = rel(to, p3);
     // draw.io edges have one colour: use the first chain's.
     const color = chainColor(e.chainIds[0]) ?? COLORS.muted;
-    const style = `curved=1;html=1;endArrow=classic;endFill=1;strokeColor=${color};exitX=${ex.x};exitY=${ex.y};exitDx=0;exitDy=0;exitPerimeter=0;entryX=${en.x};entryY=${en.y};entryDx=0;entryDy=0;entryPerimeter=0;${sk}`;
+    const a = anim ? animEdge(anim, e.id, step!) : null;
+    const style = `curved=1;html=1;endArrow=classic;endFill=1;${a ? a.style : `strokeColor=${color};`}exitX=${ex.x};exitY=${ex.y};exitDx=0;exitDy=0;exitPerimeter=0;entryX=${en.x};entryY=${en.y};entryDx=0;entryDy=0;entryPerimeter=0;${sk}`;
     cells.push(
-      `<mxCell id="${esc(`e:${e.id}`)}" style="${esc(style)}" edge="1" parent="1" source="${esc(tabId(from))}" target="${esc(tabId(to))}"><mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="${c1.x}" y="${c1.y}"/><mxPoint x="${c2.x}" y="${c2.y}"/></Array></mxGeometry></mxCell>`,
+      `<mxCell id="${esc(`e:${e.id}`)}" value="${esc(a?.value ?? '')}" style="${esc(style)}" edge="1" parent="1" source="${esc(tabId(from))}" target="${esc(tabId(to))}"><mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="${c1.x}" y="${c1.y}"/><mxPoint x="${c2.x}" y="${c2.y}"/></Array></mxGeometry></mxCell>`,
     );
   }
 
@@ -87,22 +161,26 @@ export function toDrawio(layout: Layout, vm: ViewModel, groups: Group[], opts: {
     vertex(`b:${b.key}`, '', `rounded=1;fillColor=none;strokeWidth=2;strokeColor=${colorOf.get(b.groupId) ?? COLORS.muted};pointerEvents=0;`, b.rect.x, b.rect.y, b.rect.w, b.rect.h);
   }
 
-  return [
-    `<mxfile host="Topico">`,
-    `<diagram name="${esc(opts.title)}" id="topico">`,
-    `<mxGraphModel grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="0" math="0" shadow="0">`,
-    `<root><mxCell id="0"/><mxCell id="1" parent="0"/>`,
-    ...cells,
-    `</root></mxGraphModel></diagram></mxfile>`,
-  ].join('\n');
+  if (anim) {
+    const b = layout.bounds;
+    const lines = step === 0 ? anim.count + 1 : anim.stepLabels[step! - 1].length + 1;
+    vertex('anim:caption', animCaption(anim, step!), `text;html=1;align=left;verticalAlign=top;whiteSpace=wrap;fontSize=12;fillColor=#ffffff;strokeColor=${anim.color};spacing=6;`, b.x - 20, b.y - 30 - lines * 16, 520, 16 + lines * 16);
+  }
+  return cells;
 }
 
-export function toChainSvg(layout: ChainLayout): string {
-  return `<?xml version="1.0" encoding="UTF-8"?>\n${renderToStaticMarkup(createElement(ChainSvg, { layout, standalone: true }))}`;
+export function toChainSvg(layout: ChainLayout, anim?: ChainSvgProps['anim']): string {
+  return `<?xml version="1.0" encoding="UTF-8"?>\n${renderToStaticMarkup(createElement(ChainSvg, { layout, standalone: true, anim }))}`;
 }
 
 /** draw.io XML for the broker-tube view of a chain. */
-export function toChainDrawio(l: ChainLayout, opts: { sketch: boolean }): string {
+export function toChainDrawio(l: ChainLayout, opts: { sketch: boolean; anim?: DrawioAnim }): string {
+  const pages = animPages(opts.anim, l.chainName).map((pg) => ({ name: pg.name, cells: chainCells(l, opts, pg.step) }));
+  return wrapPages(pages, 'topico-chain');
+}
+
+function chainCells(l: ChainLayout, opts: { sketch: boolean; anim?: DrawioAnim }, step: number | undefined): string[] {
+  const anim = step !== undefined ? opts.anim : undefined;
   const sk = opts.sketch ? SKETCH : '';
   const cells: string[] = [];
   const vertex = (id: string, value: string, style: string, x: number, y: number, w: number, h: number) =>
@@ -130,23 +208,21 @@ export function toChainDrawio(l: ChainLayout, opts: { sketch: boolean }): string
   for (const a of l.arrows) {
     const ex = rel(a.from);
     const en = rel(a.to);
-    const style = `${a.curved ? 'curved=1;' : 'edgeStyle=none;'}html=1;endArrow=classic;endFill=1;strokeColor=${l.color};strokeWidth=1.5;fontSize=9;labelBackgroundColor=#ffffff;exitX=${ex.x};exitY=${ex.y};exitDx=0;exitDy=0;exitPerimeter=0;entryX=${en.x};entryY=${en.y};entryDx=0;entryDy=0;entryPerimeter=0;${sk}`;
+    const st = anim ? animEdge(anim, a.id, step!) : null;
+    const style = `${a.curved ? 'curved=1;' : 'edgeStyle=none;'}html=1;endArrow=classic;endFill=1;${st ? st.style : `strokeColor=${l.color};strokeWidth=1.5;`}fontSize=9;labelBackgroundColor=#ffffff;exitX=${ex.x};exitY=${ex.y};exitDx=0;exitDy=0;exitPerimeter=0;entryX=${en.x};entryY=${en.y};entryDx=0;entryDy=0;entryPerimeter=0;${sk}`;
     const pts = a.curved ? `<Array as="points">${a.points.slice(1, -1).map((p) => `<mxPoint x="${p.x}" y="${p.y}"/>`).join('')}</Array>` : '';
     cells.push(
-      `<mxCell id="${esc(`a:${a.id}`)}" value="${esc(a.label?.text ?? '')}" style="${esc(style)}" edge="1" parent="1" source="${esc(cellOf(a.from))}" target="${esc(cellOf(a.to))}"><mxGeometry relative="1" as="geometry">${pts}</mxGeometry></mxCell>`,
+      `<mxCell id="${esc(`a:${a.id}`)}" value="${esc([a.label?.text, st?.value ? `(${st.value})` : ''].filter(Boolean).join(' '))}" style="${esc(style)}" edge="1" parent="1" source="${esc(cellOf(a.from))}" target="${esc(cellOf(a.to))}"><mxGeometry relative="1" as="geometry">${pts}</mxGeometry></mxCell>`,
     );
   }
   for (const bar of l.bars) {
     vertex(`b:${bar.topicId}`, bar.name, `rounded=1;whiteSpace=wrap;html=1;fontSize=10;fillColor=${l.color}26;strokeColor=${COLORS.ink};${sk}`, bar.rect.x, bar.rect.y, bar.rect.w, bar.rect.h);
   }
-  return [
-    `<mxfile host="Topico">`,
-    `<diagram name="${esc(l.chainName)}" id="topico-chain">`,
-    `<mxGraphModel grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="0" math="0" shadow="0">`,
-    `<root><mxCell id="0"/><mxCell id="1" parent="0"/>`,
-    ...cells,
-    `</root></mxGraphModel></diagram></mxfile>`,
-  ].join('\n');
+  if (anim) {
+    const lines = step === 0 ? anim.count + 1 : anim.stepLabels[step! - 1].length + 1;
+    vertex('anim:caption', animCaption(anim, step!), `text;html=1;align=left;verticalAlign=top;whiteSpace=wrap;fontSize=12;fillColor=#ffffff;strokeColor=${anim.color};spacing=6;`, l.tube.x + l.tube.w + 60, b.y + 10, 420, 16 + lines * 16);
+  }
+  return cells;
 }
 
 export function toSosSvg(layout: SosLayout): string {

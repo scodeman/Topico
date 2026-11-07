@@ -1,6 +1,7 @@
 import type { MouseEvent, SVGProps } from 'react';
 import type { ChainLayout, ChainNode } from '../engine/chainView';
-import { COLORS } from './DiagramSvg';
+import { stepState } from '../engine/animation';
+import { COLORS, StepBadge } from './DiagramSvg';
 
 const FONT = 'Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, sans-serif';
 
@@ -18,6 +19,8 @@ export interface ChainSvgProps {
   handlers?: ChainHandlers;
   standalone?: boolean;
   svgProps?: SVGProps<SVGSVGElement>;
+  /** Chain sequence being animated: arrows are styled by step, with step numbers. */
+  anim?: { arrowSteps: Map<string, number[]>; current: number } | null;
 }
 
 const truncate = (s: string, max: number) => (s.length > max ? `${s.slice(0, Math.max(1, max - 1))}…` : s);
@@ -99,9 +102,19 @@ export function ChainSvg(p: ChainSvgProps) {
       {l.nodes.map(node)}
 
       <g fill="none">
-        {l.arrows.map((a) => (
-          <g key={a.id} opacity={dim(a.topicId)}>
-            <path d={a.d} stroke={color} strokeWidth={1.6} markerEnd={`url(#${markerId})`} />
+        {l.arrows.map((a) => {
+          const state = p.anim ? stepState(p.anim.arrowSteps.get(a.id), p.anim.current) : null;
+          return (
+          <g key={a.id} opacity={state ? { active: 1, done: 0.85, pending: 0.3, off: 0.12 }[state] : dim(a.topicId)}>
+            <path
+              d={a.d}
+              stroke={state === 'pending' || state === 'off' ? COLORS.muted : color}
+              strokeWidth={state === 'active' ? 3.4 : state === 'done' ? 2.2 : 1.6}
+              strokeDasharray={state === 'active' ? '10 6' : state === 'pending' ? '3 4' : undefined}
+              markerEnd={`url(#${markerId})`}
+            >
+              {state === 'active' && <animate attributeName="stroke-dashoffset" from="32" to="0" dur="0.8s" repeatCount="indefinite" />}
+            </path>
             {a.label && (
               <text
                 x={a.label.horizontal ? a.label.at.x : a.label.at.x + 5}
@@ -118,7 +131,8 @@ export function ChainSvg(p: ChainSvgProps) {
               </text>
             )}
           </g>
-        ))}
+          );
+        })}
       </g>
 
       {l.bars.map((bar) => {
@@ -143,6 +157,23 @@ export function ChainSvg(p: ChainSvgProps) {
           </g>
         );
       })}
+
+      {p.anim &&
+        l.arrows.map((a) => {
+          const steps = p.anim!.arrowSteps.get(a.id);
+          if (!steps?.length) return null;
+          const pts = a.points;
+          const m =
+            pts.length === 4
+              ? { x: (pts[0].x + 3 * pts[1].x + 3 * pts[2].x + pts[3].x) / 8, y: (pts[0].y + 3 * pts[1].y + 3 * pts[2].y + pts[3].y) / 8 }
+              : (() => {
+                  // Labelled relays carry the topic name at their middle: put the badge a third of the way instead.
+                  const t = a.label ? 0.3 : 0.5;
+                  const [p0, p1] = [pts[0], pts[pts.length - 1]];
+                  return { x: p0.x + (p1.x - p0.x) * t, y: p0.y + (p1.y - p0.y) * t };
+                })();
+          return <StepBadge key={`badge:${a.id}`} at={m} steps={steps} state={stepState(steps, p.anim!.current)} color={color} />;
+        })}
 
       {l.empty && (
         <text x={t.x + t.w / 2} y={t.y + t.h / 2} textAnchor="middle" dominantBaseline="middle" fontSize={13} fill={COLORS.ink}>

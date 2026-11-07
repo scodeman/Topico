@@ -1,4 +1,5 @@
 import type { CSSProperties, MouseEvent, SVGProps } from 'react';
+import { stepState } from '../engine/animation';
 import { labelArea, type EdgeGeom, type Layout, type NodeGeom, type Rect, type TabGeom } from '../engine/layout';
 import type { ViewModel } from '../engine/view';
 import type { Group } from '../model/types';
@@ -38,6 +39,8 @@ export interface DiagramProps {
   standalone?: boolean;
   /** Extra attributes for the root <svg> (viewBox, handlers…) when embedded on screen. */
   svgProps?: SVGProps<SVGSVGElement>;
+  /** Chain sequence being animated: arrows are styled by step, with step numbers. */
+  anim?: { edgeSteps: Map<string, number[]>; current: number; color: string } | null;
 }
 
 const truncate = (s: string, max: number) => (s.length > max ? `${s.slice(0, Math.max(1, max - 1))}…` : s);
@@ -57,7 +60,8 @@ export function DiagramSvg(p: DiagramProps) {
   const at = (r: Rect) => (animate ? undefined : `translate(${r.x},${r.y})`);
   const b = layout.bounds;
   const chainColors = (ids: string[]) => ids.map((c) => chainColor(c)).filter((c): c is string => !!c);
-  const edgeColors = [...new Set(layout.edges.map((e) => chainColors(e.chainIds)[0] ?? COLORS.muted))];
+  const edgeColors = [...new Set([...layout.edges.map((e) => chainColors(e.chainIds)[0] ?? COLORS.muted), ...(p.anim ? [p.anim.color] : [])])];
+  const anim = p.anim;
 
   const node = (n: NodeGeom) => {
     const sel = p.selectedNodes?.has(n.id);
@@ -179,11 +183,31 @@ export function DiagramSvg(p: DiagramProps) {
 
       <g fill="none">
         {layout.edges.map((e) => {
+          const style = animate ? ({ d: `path("${e.d}")`, transition: 'd .35s ease, opacity .2s' } as CSSProperties) : undefined;
+          if (anim) {
+            // Sequence playback: current step flows, earlier steps stay lit, later steps and other arrows fade.
+            const state = stepState(anim.edgeSteps.get(e.id), anim.current);
+            const lit = state === 'active' || state === 'done';
+            const col = lit ? anim.color : COLORS.muted;
+            return (
+              <g key={e.id} opacity={{ active: 1, done: 0.85, pending: 0.3, off: 0.08 }[state]}>
+                <path
+                  d={e.d}
+                  stroke={col}
+                  strokeWidth={state === 'active' ? 3.4 : lit ? 2.2 : 1.3}
+                  strokeDasharray={state === 'active' ? '10 6' : state === 'pending' ? '3 4' : undefined}
+                  markerEnd={`url(#${markerId(col)})`}
+                  style={style}
+                >
+                  {state === 'active' && <animate attributeName="stroke-dashoffset" from="32" to="0" dur="0.8s" repeatCount="indefinite" />}
+                </path>
+              </g>
+            );
+          }
           const colors = chainColors(e.chainIds);
           const c = colors[0] ?? COLORS.muted;
           const hit = edgeHit(e);
           const width = active && hit ? 2.2 : colors.length ? 1.8 : 1.3;
-          const style = animate ? ({ d: `path("${e.d}")`, transition: 'd .35s ease, opacity .2s' } as CSSProperties) : undefined;
           const opacity = (hit ? 1 : 0.12) * 0.9;
           const DASH = 8;
           return (
@@ -215,6 +239,16 @@ export function DiagramSvg(p: DiagramProps) {
 
       {layout.nodes.flatMap((n) => n.tabs.map(tab))}
 
+      {anim &&
+        layout.edges.map((e) => {
+          const steps = anim.edgeSteps.get(e.id);
+          if (!steps?.length) return null;
+          const state = stepState(steps, anim.current);
+          const [p0, p1, p2, p3] = e.points;
+          const m = { x: (p0.x + 3 * p1.x + 3 * p2.x + p3.x) / 8, y: (p0.y + 3 * p1.y + 3 * p2.y + p3.y) / 8 };
+          return <StepBadge key={`badge:${e.id}`} at={m} steps={steps} state={state} color={anim.color} />;
+        })}
+
       {layout.brackets.filter((br) => groupColor.has(br.groupId)).map((br) => (
         <rect
           key={br.key}
@@ -230,6 +264,22 @@ export function DiagramSvg(p: DiagramProps) {
         />
       ))}
     </svg>
+  );
+}
+
+/** Step number(s) of an arrow during sequence playback. */
+export function StepBadge({ at, steps, state, color }: { at: { x: number; y: number }; steps: number[]; state: string; color: string }) {
+  const text = steps.join(',');
+  const r = state === 'active' ? 12 : 9;
+  const w = Math.max(2 * r, text.length * 6.5 + 8);
+  const lit = state === 'active' || state === 'done';
+  return (
+    <g pointerEvents="none" opacity={state === 'pending' ? 0.6 : 1}>
+      <rect x={at.x - w / 2} y={at.y - r} width={w} height={2 * r} rx={r} fill={lit ? color : '#fff'} stroke={lit ? '#fff' : COLORS.muted} strokeWidth={1.5} />
+      <text x={at.x} y={at.y} textAnchor="middle" dominantBaseline="central" fontSize={state === 'active' ? 12 : 10} fontWeight={700} fill={lit ? '#fff' : COLORS.muted}>
+        {text}
+      </text>
+    </g>
   );
 }
 
