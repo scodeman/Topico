@@ -4,7 +4,16 @@
 
 Topico places your systems around a central broker, draws the topics they exchange, and keeps the diagram readable as you focus, group, hide or animate parts of it. Everything runs in the browser: no server, no account.
 
-[![Pages](https://github.com/scodeman/topico/actions/workflows/pages.yml/badge.svg)](https://github.com/scodeman/topico/actions/workflows/pages.yml)
+[![Build and deploy](https://github.com/scodeman/topico/actions/workflows/pages.yml/badge.svg)](https://github.com/scodeman/topico/actions/workflows/pages.yml)
+[![Live demo](https://img.shields.io/website?url=https%3A%2F%2Fscodeman.github.io%2FTopico%2F&label=live%20demo&up_message=online&down_message=offline)](https://scodeman.github.io/Topico/)
+[![Last commit](https://img.shields.io/github/last-commit/scodeman/topico)](https://github.com/scodeman/topico/commits/master)
+[![Dependabot](https://img.shields.io/badge/dependabot-enabled-025E8C?logo=dependabot)](.github/dependabot.yml)
+[![Licence: MIT](https://img.shields.io/github/license/scodeman/topico)](LICENSE)
+
+[![TypeScript](https://img.shields.io/github/package-json/dependency-version/scodeman/topico/dev/typescript?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![React](https://img.shields.io/github/package-json/dependency-version/scodeman/topico/react?logo=react)](https://react.dev/)
+[![Vite](https://img.shields.io/github/package-json/dependency-version/scodeman/topico/dev/vite?logo=vite&logoColor=white)](https://vite.dev/)
+[![Vitest](https://img.shields.io/github/package-json/dependency-version/scodeman/topico/dev/vitest?logo=vitest&logoColor=white)](https://vitest.dev/)
 
 ### ▶ [Open the app](https://scodeman.github.io/Topico/)
 
@@ -137,3 +146,7 @@ Dependabot starts working as soon as this file is on the default branch of a Git
 - `src/export`: SVG and draw.io exporters, including multi-page animated draw.io files.
 - `src/components`: toolbar, explorer (left), canvas, details pane (right), and the animation player.
 - `docs/images`: the screenshots used in this README.
+
+## Licence
+
+Topico is open source under the [MIT licence](LICENSE): you can use, change and share it freely, including in commercial work, as long as you keep the copyright notice.

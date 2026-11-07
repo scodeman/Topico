@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Version | 0.15 |
+| Version | 0.16 |
 | Last updated | 2026-11-07 |
 | Reference material | [`images/`](images/) (hand-drawn target views), [`Topico.drawio`](Topico.drawio) (source sketch) |
 
@@ -257,6 +257,7 @@ The original request did not settle these points. They were decided during the i
 | Date | Version | Change |
 |---|---|---|
 | 2026-11-07 | 0.1 | Initial build covering §4.1–4.6, §4.8 and §4.10. Reference material moved to `docs/spec/`. |
+| 2026-11-07 | 0.16 | Open source under the MIT licence. README badges, screenshots and live-app link. |
 | 2026-11-07 | 0.15 | Chain sequences, animate mode, and animated draw.io export (GRP-13 to GRP-15). |
 | 2026-11-07 | 0.14 | Automated dependency updates with GitHub Dependabot (NFR-07). |
 | 2026-11-07 | 0.13 | Bundle and chain colouring can be hidden from the left panel, the legend or the group pane (GRP-12). The content stays. |
