@@ -1,0 +1,64 @@
+# Publishes a GitHub Release whenever a version tag is pushed:
+#   npm version minor            # bumps package.json and creates the tag, e.g. v1.1.0
+#   git push --follow-tags
+# The release notes list the commits since the previous tag, and the built site is attached as a zip.
+
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write # create the release and upload its asset
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # full history and tags, for the release notes
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+
+      - name: Check the tag matches package.json
+        run: |
+          expected="v$(node -p "require('./package.json').version")"
+          if [ "$GITHUB_REF_NAME" != "$expected" ]; then
+            echo "::warning::Tag $GITHUB_REF_NAME does not match package.json version ($expected)."
+          fi
+
+      - name: Package the site
+        run: cd dist && zip -qr "../topico-${GITHUB_REF_NAME}-site.zip" .
+
+      - name: Write release notes from the commits since the previous tag
+        run: |
+          previous=$(git describe --tags --abbrev=0 "${GITHUB_REF_NAME}^" 2>/dev/null || true)
+          range=${previous:+$previous..}$GITHUB_REF_NAME
+          {
+            echo "## Changes"
+            echo
+            git log --no-merges --format='- %s (%h)' "$range"
+            echo
+            echo "**Try it:** https://scodeman.github.io/Topico/"
+            echo
+            echo "The attached \`topico-${GITHUB_REF_NAME}-site.zip\` is the built static site: unzip it on any web server."
+            if [ -n "$previous" ]; then
+              echo
+              echo "**Full changelog:** https://github.com/${GITHUB_REPOSITORY}/compare/${previous}...${GITHUB_REF_NAME}"
+            fi
+          } > release-notes.md
+          cat release-notes.md
+
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" "topico-${GITHUB_REF_NAME}-site.zip" --title "Topico $GITHUB_REF_NAME" --notes-file release-notes.md --verify-tag
