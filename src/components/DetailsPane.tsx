@@ -8,6 +8,7 @@ import {
   type Interaction,
   type Property,
   type Side,
+  type SosRole,
 } from '../model/types';
 
 /** Right panel: view and edit details of the focused element. */
@@ -57,6 +58,15 @@ function CentrePane() {
       <h3 className="pane-kind">Central broker</h3>
       <Text label="Name" value={centre.name} onChange={(name) => update({ name })} />
       <Text label="Description" value={centre.description} onChange={(description) => update({ description })} multiline />
+      <Select
+        label="System of System view"
+        value={centre.sos}
+        options={[
+          ['inner', 'Inner (inside the SoS box)'],
+          ['none', 'Not shown'],
+        ]}
+        onChange={(v) => update({ sos: v as 'inner' | 'none' })}
+      />
       <Properties value={centre.properties} onChange={(properties) => update({ properties })} />
       <p className="muted small">
         {model.systems.length} systems · {model.topics.length} topics · {model.interactions.length} interactions
@@ -96,6 +106,17 @@ function SystemPane({ id }: { id: string }) {
         onChange={(v) => st().updateSystem(id, { parentId: v || null })}
       />
       <Text label="Owner" value={sys.owner} onChange={(owner) => st().updateSystem(id, { owner })} />
+      <Select
+        label="System of System view"
+        value={sys.sos}
+        options={[
+          ['inner', 'Inner (inside the SoS box)'],
+          ['outer', 'Outer (around the SoS box)'],
+          ['none', 'Not shown'],
+        ]}
+        onChange={(v) => st().updateSystem(id, { sos: v as SosRole })}
+      />
+      <Text label="Notes (shown in SoS callouts)" value={sys.notes} onChange={(notes) => st().updateSystem(id, { notes })} multiline />
       <Text label="Description" value={sys.description} onChange={(description) => st().updateSystem(id, { description })} multiline />
       <Properties value={sys.properties} onChange={(properties) => st().updateSystem(id, { properties })} />
       <label className="check">
@@ -283,6 +304,10 @@ function GroupPane({ id }: { id: string }) {
         </label>
       </div>
       <Text label="Description" value={g.description} onChange={(description) => st().updateGroup(id, { description })} multiline />
+      <label className="check">
+        <input type="checkbox" checked={g.hidden} onChange={(e) => st().updateGroup(id, { hidden: e.target.checked })} />
+        Hide colouring ({isBundle ? 'no outline around its topics' : 'its endpoints and arrows go back to the default colour'})
+      </label>
       <div className="btn-row">
         <button onClick={() => st().filterOn('topic', `grp:${id}`, false)}>Focus view</button>
       </div>

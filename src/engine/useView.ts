@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { useStore } from '../model/store';
 import { computeChainLayout } from './chainView';
 import { layoutView } from './layout';
+import { computeSosLayout } from './sosView';
 import { computeView } from './view';
 
 /** Current filtered view model and its layout, recomputed on every model/filter change. */
@@ -21,5 +22,7 @@ export function useView() {
   const layout = useMemo(() => layoutView(vm), [vm]);
   // Broker-tube view of one chain, when toggled from the explorer.
   const chainLayout = useMemo(() => (ui.chainView ? computeChainLayout(model, ui.chainView) : null), [model, ui.chainView]);
-  return { model, ui, vm, layout, chainLayout };
+  // System of System view, when selected in the toolbar (the chain view takes precedence).
+  const sosLayout = useMemo(() => (!ui.chainView && ui.view === 'sos' ? computeSosLayout(model) : null), [model, ui.chainView, ui.view]);
+  return { model, ui, vm, layout, chainLayout, sosLayout };
 }

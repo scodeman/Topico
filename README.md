@@ -40,7 +40,9 @@ The model is saved automatically in the browser (localStorage). Use **Save JSON*
   - Topics: drag topics to reorder them. The sort button in the section header shows ↑ (A–Z), ↓ (Z–A) or ↕ (custom order). Click it to sort A–Z, or Z–A when the list is already A–Z.
   - Double-click any item to rename it.
   - Right-click any item for Rename, Duplicate and Delete.
+- On a bundle or chain, ● / ◌ (or a click on it in the canvas legend) hides or shows its colouring only. Its topics and flows stay, drawn in the default style.
 - ● / ◌ hides or shows a system (with its upstream systems) or a topic. Single interactions can be hidden from the system or topic pane.
+- **System of System view**: switch the toolbar to **System of System** to see the inner systems in a central box and the outer systems around it like petals, each with a note callout and arrows listing the topics exchanged. Set each system **Inner**, **Outer** or **Not shown** with the role button on its row in the left panel (shown while the SoS view is on), from its right-click menu, or in its details pane. The bar above the canvas sets the box title, switches the **inside lines** on or off, and chooses what the callouts show (notes, description, properties, topics). When the broker is shown, it sits in the middle of the box and every inside line goes through it. A parent and its leaf can be shown or hidden independently. By default only the broker is inside, every system is outside with its notes, and ETLs are not shown.
 - Click **View** on a chain in the left panel to see it as a broker tube: topics are bars inside the tube, and the chain's systems sit around it. Click again, or use "Back to diagram", to return. SVG and draw.io export the tube view while it is shown.
 - **Group topics** collapses topics into one tab per bundle or per chain.
 - The layout is recomputed on every change. It sizes boxes to their content, reorders tabs to reduce crossings and keeps bundle members together, and it never lets boxes overlap.
@@ -76,6 +78,17 @@ One-time setup: in the repository, open **Settings → Pages → Build and deplo
 - **Who can see the site:**
   - **GitLab:** Pages can be restricted to project members under **Settings → General → Visibility → Pages**.
   - **GitHub:** Pages sites are public, even from a private repository, unless the organization is on GitHub Enterprise Cloud with private Pages. Publishing from a private repository also needs a paid plan.
+
+## Dependency updates
+
+[`.github/dependabot.yml`](.github/dependabot.yml) turns on GitHub Dependabot for two kinds of dependency:
+
+- **npm packages** (`package.json`). Minor and patch updates are grouped into one pull request each week. Each major update gets its own pull request, because it may need code changes.
+- **GitHub Actions** used by the Pages workflow, grouped into one weekly pull request.
+
+Pull requests open on Mondays (Sydney time), are labelled `dependencies`, and use conventional commit messages (`build(deps): …`, `ci(deps): …`). Each one runs the `test` job of the Pages workflow, which checks types and runs the tests, before you merge it.
+
+Dependabot starts working as soon as this file is on the default branch of a GitHub repository. To be notified of vulnerable packages as well, turn on **Settings → Code security → Dependabot alerts** and **Dependabot security updates**. Dependabot only works on GitHub; the GitLab mirror gets no automatic updates.
 
 ## Code map
 

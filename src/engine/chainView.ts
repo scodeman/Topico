@@ -328,7 +328,7 @@ export function computeChainLayout(model: Model, chainId: string): ChainLayout |
   return {
     chainId,
     chainName: chain.name,
-    color: chain.color,
+    color: chain.hidden ? '#64748b' : chain.color,
     title: `${chain.name} — topic chain through ${model.centre.name}`,
     tube,
     nodes,

@@ -6,6 +6,9 @@ export type NodeKind = 'system' | 'etl';
 /** Direction is always relative to the node's parent (the centre broker, or the upstream system it hangs off). */
 export type Direction = 'produce' | 'consume';
 export type GroupType = 'bundle' | 'chain';
+/** Place of a system in the System of System (SoS) view. */
+export type SosRole = 'inner' | 'outer' | 'none';
+export const SOS_ROLE_LABEL: Record<SosRole, string> = { inner: 'Inner', outer: 'Outer', none: 'Not shown' };
 
 export interface Property {
   key: string;
@@ -17,6 +20,8 @@ export interface Centre {
   name: string;
   description: string;
   properties: Property[];
+  /** The broker is inside the SoS by default; it can be left out but never placed outside. */
+  sos: Exclude<SosRole, 'outer'>;
 }
 
 export interface SystemNode {
@@ -31,6 +36,10 @@ export interface SystemNode {
   owner: string;
   properties: Property[];
   hidden: boolean;
+  /** Inner (inside the SoS box), outer (around it) or not shown in the SoS view. */
+  sos: SosRole;
+  /** Free notes, shown in the SoS view callouts. */
+  notes: string;
 }
 
 export interface Topic {
@@ -64,6 +73,25 @@ export interface Group {
   type: GroupType;
   color: string;
   description: string;
+  /** Hides the group's colouring only (bundle outline, chain colours): its topics and endpoints stay, drawn individually. */
+  hidden: boolean;
+}
+
+/** What the SoS view's callouts show for each outer system. */
+export interface SosCalloutOptions {
+  notes: boolean;
+  description: boolean;
+  properties: boolean;
+  /** Comma-separated property keys to show; empty = all properties. */
+  propertyKeys: string;
+  topics: boolean;
+}
+
+export interface SosSettings {
+  title: string;
+  /** Show the topic lines inside the SoS box (lines to/from outer systems are always shown). */
+  innerLines: boolean;
+  callouts: SosCalloutOptions;
 }
 
 export interface Model {
@@ -73,7 +101,14 @@ export interface Model {
   topics: Topic[];
   interactions: Interaction[];
   groups: Group[];
+  sos: SosSettings;
 }
+
+export const defaultSosSettings = (): SosSettings => ({
+  title: 'System of System',
+  innerLines: true,
+  callouts: { notes: true, description: false, properties: false, propertyKeys: '', topics: false },
+});
 
 export const CENTRE_ID = 'centre';
 
@@ -84,13 +119,17 @@ export function newId(prefix: string): string {
 export function emptyModel(): Model {
   return {
     version: 1,
-    centre: { id: 'centre', name: 'CENTER SYS', description: '', properties: [] },
+    centre: { id: 'centre', name: 'CENTER SYS', description: '', properties: [], sos: 'inner' },
     systems: [],
     topics: [],
     interactions: [],
     groups: [],
+    sos: defaultSosSettings(),
   };
 }
+
+/** Default SoS role: systems (parents and leaves) around the SoS box, ETLs not shown. Only the broker is inside. */
+export const defaultSosRole = (kind: NodeKind): SosRole => (kind === 'etl' ? 'none' : 'outer');
 
 /** Fill in defaults so hand-written or older JSON files load safely. */
 export function normalizeModel(raw: unknown): Model {
@@ -100,9 +139,21 @@ export function normalizeModel(raw: unknown): Model {
     topics?: (Partial<Topic> & { chainId?: string | null })[];
     interactions?: (Partial<Interaction> & { chainId?: string | null })[];
     groups?: Partial<Group>[];
+    sos?: Partial<Omit<SosSettings, 'callouts'>> & { callouts?: Partial<SosCalloutOptions> };
   };
   const base = emptyModel();
-  const sysDefaults: Omit<SystemNode, 'id' | 'name'> = { kind: 'system', side: 'W', parentId: null, description: '', owner: '', properties: [], hidden: false };
+  const sysDefaults: Omit<SystemNode, 'id' | 'name'> = {
+    kind: 'system',
+    side: 'W',
+    parentId: null,
+    description: '',
+    owner: '',
+    properties: [],
+    hidden: false,
+    sos: 'outer',
+    notes: '',
+  };
+  const sos = defaultSosSettings();
   const topicDefaults: Omit<Topic, 'id' | 'name'> = { description: '', owner: '', format: '', properties: [], bundleId: null, hidden: false };
   // Older files stored one chain on the topic (v0.1), then one chain per endpoint (v0.2–0.5): convert both to `chainIds`.
   const legacyChain = new Map((m.topics ?? []).filter((t) => t.id && t.chainId).map((t) => [t.id!, t.chainId!]));
@@ -110,13 +161,17 @@ export function normalizeModel(raw: unknown): Model {
     version: 1,
     centre: { ...base.centre, ...(m.centre ?? {}), id: 'centre' },
     // Older files call ETLs "exe".
-    systems: (m.systems ?? []).map((s) => ({ ...sysDefaults, ...s, kind: s.kind === 'exe' ? 'etl' : (s.kind ?? 'system') }) as SystemNode),
+    systems: (m.systems ?? []).map((s) => {
+      const kind: NodeKind = s.kind === 'exe' ? 'etl' : (s.kind ?? 'system');
+      return { ...sysDefaults, sos: defaultSosRole(kind), ...s, kind } as SystemNode;
+    }),
     topics: (m.topics ?? []).map(({ chainId: _legacy, ...t }) => ({ ...topicDefaults, ...t }) as Topic),
     interactions: (m.interactions ?? []).map(({ chainId, ...i }) => {
       const legacy = chainId ?? (i.topicId && legacyChain.get(i.topicId)) ?? null;
       return { hidden: false, ...i, chainIds: i.chainIds ?? (legacy ? [legacy] : []) } as Interaction;
     }),
-    groups: (m.groups ?? []).map((g) => ({ description: '', color: '#6366f1', ...g }) as Group),
+    groups: (m.groups ?? []).map((g) => ({ description: '', color: '#6366f1', hidden: false, ...g }) as Group),
+    sos: { ...sos, ...(m.sos ?? {}), callouts: { ...sos.callouts, ...(m.sos?.callouts ?? {}) } },
   };
 }
 

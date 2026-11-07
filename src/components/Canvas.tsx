@@ -4,6 +4,8 @@ import { CENTRE_ID } from '../model/types';
 import { useStore } from '../model/store';
 import { ChainSvg, type ChainHandlers } from './ChainSvg';
 import { DiagramSvg, type DiagramHandlers } from './DiagramSvg';
+import { SosBar } from './SosBar';
+import { SosSvg, type SosHandlers } from './SosSvg';
 
 interface Box {
   x: number;
@@ -13,12 +15,12 @@ interface Box {
 }
 
 export function Canvas() {
-  const { model, ui, vm, layout, chainLayout } = useView();
+  const { model, ui, vm, layout, chainLayout, sosLayout } = useView();
   const setFocus = useStore((s) => s.setFocus);
   const filterOn = useStore((s) => s.filterOn);
   const setUi = useStore((s) => s.setUi);
   const wrapRef = useRef<HTMLDivElement>(null);
-  const bounds = chainLayout?.bounds ?? layout.bounds;
+  const bounds = chainLayout?.bounds ?? sosLayout?.bounds ?? layout.bounds;
   const [box, setBox] = useState<Box>(bounds);
   const drag = useRef<{ x: number; y: number; box: Box; moved: boolean } | null>(null);
 
@@ -106,6 +108,15 @@ export function Canvas() {
     }),
     [setFocus, setUi],
   );
+  const sosHandlers: SosHandlers = useMemo(
+    () => ({
+      onNodeClick: (id, e) => {
+        e.stopPropagation();
+        if (!wasDrag()) setFocus(id === CENTRE_ID ? { kind: 'centre' } : { kind: 'system', id });
+      },
+    }),
+    [setFocus],
+  );
 
   const focus = ui.focus;
   const selectedNodes = new Set(ui.filterSystems);
@@ -117,8 +128,20 @@ export function Canvas() {
 
   return (
     <div className="canvas" ref={wrapRef} onMouseMove={onMouseMove} onMouseUp={endDrag} onMouseLeave={endDrag}>
-      <FilterBar />
-      {chainLayout ? (
+      {sosLayout ? <SosBar /> : <FilterBar />}
+      {sosLayout ? (
+        <SosSvg
+          layout={sosLayout}
+          selectedNodes={selectedNodes}
+          handlers={sosHandlers}
+          svgProps={{
+            viewBox: `${box.x} ${box.y} ${box.w} ${box.h}`,
+            preserveAspectRatio: 'xMidYMid meet',
+            className: 'diagram',
+            onMouseDown,
+          }}
+        />
+      ) : chainLayout ? (
         <ChainSvg
           layout={chainLayout}
           selectedNodes={selectedNodes}
@@ -156,8 +179,8 @@ export function Canvas() {
         <button onClick={() => setBox((bx) => zoom(bx, 0.8))} title="Zoom in">+</button>
         <button onClick={() => setBox((bx) => zoom(bx, 1.25))} title="Zoom out">−</button>
       </div>
-      <Legend />
-      {!chainLayout && Object.keys(vm.nodes).length === 0 && (
+      {!sosLayout && <Legend />}
+      {!chainLayout && !sosLayout && Object.keys(vm.nodes).length === 0 && (
         <div className="empty-hint">Add systems and topics from the left panel to start drawing.</div>
       )}
     </div>
@@ -215,13 +238,21 @@ function FilterBar() {
   );
 }
 
+/** Group legend; clicking a group turns its colouring off or on (bundle outline, chain colours). */
 function Legend() {
   const groups = useStore((s) => s.model.groups);
+  const updateGroup = useStore((s) => s.updateGroup);
   if (!groups.length) return null;
   return (
     <div className="legend">
       {groups.map((g) => (
-        <div key={g.id} className="legend-row">
+        <button
+          key={g.id}
+          className={`legend-row${g.hidden ? ' is-hidden' : ''}`}
+          onClick={() => updateGroup(g.id, { hidden: !g.hidden })}
+          title={g.hidden ? `Show the ${g.type} colouring of ${g.name}` : `Hide the ${g.type} colouring of ${g.name}`}
+          aria-pressed={!g.hidden}
+        >
           {g.type === 'bundle' ? (
             <span className="swatch swatch-bundle" style={{ borderColor: g.color }} />
           ) : (
@@ -229,7 +260,7 @@ function Legend() {
           )}
           {g.name}
           <span className="muted"> · {g.type}</span>
-        </div>
+        </button>
       ))}
     </div>
   );

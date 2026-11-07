@@ -2,6 +2,8 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { ChainSvg } from '../components/ChainSvg';
 import { DiagramSvg, COLORS } from '../components/DiagramSvg';
+import { NOTE, SosSvg } from '../components/SosSvg';
+import type { SosLayout } from '../engine/sosView';
 import type { ChainEnd, ChainLayout } from '../engine/chainView';
 import { labelArea, type Layout, type TabGeom } from '../engine/layout';
 import type { ViewModel } from '../engine/view';
@@ -20,7 +22,7 @@ const SKETCH = 'sketch=1;curveFitting=1;jiggle=2;fontFamily=Architects Daughter;
 /** draw.io / diagrams.net (mxGraph) XML for the current view. */
 export function toDrawio(layout: Layout, vm: ViewModel, groups: Group[], opts: { sketch: boolean; showStubs: boolean; title: string }): string {
   const sk = opts.sketch ? SKETCH : '';
-  const colorOf = new Map(groups.map((g) => [g.id, g.color]));
+  const colorOf = new Map(groups.filter((g) => !g.hidden).map((g) => [g.id, g.color]));
   const chainColor = (chainId: string | null | undefined) => (chainId && colorOf.get(chainId)) || undefined;
   const cells: string[] = [];
   const vertex = (id: string, value: string, style: string, x: number, y: number, w: number, h: number) =>
@@ -81,6 +83,7 @@ export function toDrawio(layout: Layout, vm: ViewModel, groups: Group[], opts: {
   }
 
   for (const b of layout.brackets) {
+    if (!colorOf.has(b.groupId)) continue;
     vertex(`b:${b.key}`, '', `rounded=1;fillColor=none;strokeWidth=2;strokeColor=${colorOf.get(b.groupId) ?? COLORS.muted};pointerEvents=0;`, b.rect.x, b.rect.y, b.rect.w, b.rect.h);
   }
 
@@ -139,6 +142,59 @@ export function toChainDrawio(l: ChainLayout, opts: { sketch: boolean }): string
   return [
     `<mxfile host="Topico">`,
     `<diagram name="${esc(l.chainName)}" id="topico-chain">`,
+    `<mxGraphModel grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="0" math="0" shadow="0">`,
+    `<root><mxCell id="0"/><mxCell id="1" parent="0"/>`,
+    ...cells,
+    `</root></mxGraphModel></diagram></mxfile>`,
+  ].join('\n');
+}
+
+export function toSosSvg(layout: SosLayout): string {
+  return `<?xml version="1.0" encoding="UTF-8"?>\n${renderToStaticMarkup(createElement(SosSvg, { layout, standalone: true }))}`;
+}
+
+/** draw.io XML for the System of System view: the SoS box and parent frames are swimlanes, callouts are notes. */
+export function toSosDrawio(l: SosLayout, opts: { sketch: boolean }): string {
+  const sk = opts.sketch ? SKETCH : '';
+  const cells: string[] = [];
+  const vertex = (id: string, value: string, style: string, q: { x: number; y: number; w: number; h: number }) =>
+    cells.push(
+      `<mxCell id="${esc(id)}" value="${esc(value)}" style="${esc(style)}" vertex="1" parent="1"><mxGeometry x="${q.x}" y="${q.y}" width="${q.w}" height="${q.h}" as="geometry"/></mxCell>`,
+    );
+  const edge = (id: string, value: string, style: string, source: string, target: string, from: { x: number; y: number }, to: { x: number; y: number }) =>
+    cells.push(
+      `<mxCell id="${esc(id)}" value="${esc(value)}" style="${esc(style)}" edge="1" parent="1" source="${esc(source)}" target="${esc(target)}"><mxGeometry relative="1" as="geometry"><mxPoint x="${from.x}" y="${from.y}" as="sourcePoint"/><mxPoint x="${to.x}" y="${to.y}" as="targetPoint"/></mxGeometry></mxCell>`,
+    );
+  vertex('sos', l.title, `swimlane;html=1;startSize=30;fillColor=#f8fafc;swimlaneFillColor=#ffffff;strokeColor=${COLORS.ink};fontStyle=1;fontSize=14;${sk}`, l.box);
+  const rectOf = new Map<string, { x: number; y: number; w: number; h: number }>([['sos', l.box]]);
+  for (const n of l.nodes) {
+    rectOf.set(n.id, n.rect);
+    const style = n.container
+      ? `swimlane;html=1;startSize=24;fillColor=${n.kind === 'etl' ? '#cbd5e1' : '#f1f5f9'};swimlaneFillColor=#ffffff;strokeColor=${COLORS.ink};fontStyle=1;${sk}`
+      : n.kind === 'etl'
+        ? `rounded=1;whiteSpace=wrap;html=1;fillColor=${COLORS.etlFill};fontColor=#ffffff;strokeColor=${COLORS.etlFill};fontStyle=1;${sk}`
+        : `shape=cube;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;darkOpacity=0.05;darkOpacity2=0.1;size=8;fillColor=#ffffff;strokeColor=${COLORS.ink};fontStyle=1;${sk}`;
+    vertex(`n:${n.id}`, n.name, style, n.rect);
+  }
+  const cellId = (id: string) => (id === 'sos' ? 'sos' : `n:${id}`);
+  const rel = (id: string, p: { x: number; y: number }) => {
+    const q = rectOf.get(id)!;
+    return `${+((p.x - q.x) / q.w).toFixed(3)};${+((p.y - q.y) / q.h).toFixed(3)}`;
+  };
+  for (const a of l.arrows) {
+    const [ex, ey] = rel(a.from.id, a.from.at).split(';');
+    const [nx, ny] = rel(a.to.id, a.to.at).split(';');
+    const style = `edgeStyle=none;html=1;endArrow=classic;endFill=1;strokeColor=#475569;fontSize=10;labelBackgroundColor=#ffffff;exitX=${ex};exitY=${ey};exitDx=0;exitDy=0;exitPerimeter=0;entryX=${nx};entryY=${ny};entryDx=0;entryDy=0;entryPerimeter=0;${sk}`;
+    edge(`a:${a.id}`, a.label.text, style, cellId(a.from.id), cellId(a.to.id), a.from.at, a.to.at);
+  }
+  for (const c of l.callouts) {
+    const text = c.lines.map((x) => (x.heading ? `<b>${esc(x.text)}</b>` : esc(x.text))).join('<br>');
+    vertex(c.id, text, `rounded=0;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacing=6;fontSize=10;fillColor=${NOTE.fill};strokeColor=${NOTE.stroke};${sk}`, c.rect);
+    edge(`${c.id}:link`, '', `edgeStyle=none;html=1;endArrow=none;strokeColor=${NOTE.stroke};`, c.id, cellId(c.nodeId), c.tail[0], c.tail[2]);
+  }
+  return [
+    `<mxfile host="Topico">`,
+    `<diagram name="${esc(l.title)}" id="topico-sos">`,
     `<mxGraphModel grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="0" math="0" shadow="0">`,
     `<root><mxCell id="0"/><mxCell id="1" parent="0"/>`,
     ...cells,

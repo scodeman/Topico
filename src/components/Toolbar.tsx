@@ -4,25 +4,37 @@ import { resetToEmpty, resetToSample, useStore } from '../model/store';
 import type { CollapseBy } from '../engine/view';
 
 export function Toolbar() {
-  const { model, ui, vm, layout, chainLayout } = useView();
+  const { model, ui, vm, layout, chainLayout, sosLayout } = useView();
   const setUi = useStore((s) => s.setUi);
   const setModel = useStore((s) => s.setModel);
   const fileRef = useRef<HTMLInputElement>(null);
   const base = (model.centre.name || 'topico').toLowerCase().replace(/[^a-z0-9]+/g, '-');
-  const suffix = chainLayout ? `-chain-${chainLayout.chainName.toLowerCase().replace(/[^a-z0-9]+/g, '-')}` : vm.filtered ? '-view' : '';
+  const suffix = chainLayout
+    ? `-chain-${chainLayout.chainName.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`
+    : sosLayout
+      ? '-sos'
+      : vm.filtered
+        ? '-view'
+        : '';
   // Exporters (and react-dom/server, which they use) are loaded on first use to keep the initial bundle small.
   type Exporters = typeof import('../export/exporters');
   const withExporters = (fn: (ex: Exporters) => void) => () => void import('../export/exporters').then(fn);
   // Exports follow what the canvas shows: the broker-tube chain view when it is on.
   const exportSvg = withExporters((ex) =>
-    ex.download(`${base}${suffix}.svg`, chainLayout ? ex.toChainSvg(chainLayout) : ex.toSvg(layout, vm, model.groups, ui.showStubs), 'image/svg+xml'),
+    ex.download(
+      `${base}${suffix}.svg`,
+      chainLayout ? ex.toChainSvg(chainLayout) : sosLayout ? ex.toSosSvg(sosLayout) : ex.toSvg(layout, vm, model.groups, ui.showStubs),
+      'image/svg+xml',
+    ),
   );
   const exportDrawio = withExporters((ex) =>
     ex.download(
       `${base}${suffix}.drawio`,
       chainLayout
         ? ex.toChainDrawio(chainLayout, { sketch: ui.sketchExport })
-        : ex.toDrawio(layout, vm, model.groups, { sketch: ui.sketchExport, showStubs: ui.showStubs, title: model.centre.name }),
+        : sosLayout
+          ? ex.toSosDrawio(sosLayout, { sketch: ui.sketchExport })
+          : ex.toDrawio(layout, vm, model.groups, { sketch: ui.sketchExport, showStubs: ui.showStubs, title: model.centre.name }),
       'application/xml',
     ),
   );
@@ -57,6 +69,16 @@ export function Toolbar() {
         <button onClick={saveJson}>Save JSON</button>
       </div>
       <div className="tb-group">
+        <span className="seg" role="group" aria-label="View">
+          <button className={ui.view === 'diagram' && !ui.chainView ? 'on' : ''} onClick={() => setUi({ view: 'diagram', chainView: null })}>
+            Diagram
+          </button>
+          <button className={ui.view === 'sos' && !ui.chainView ? 'on' : ''} onClick={() => setUi({ view: 'sos', chainView: null })}>
+            System of System
+          </button>
+        </span>
+      </div>
+      <div className={`tb-group${sosLayout || chainLayout ? ' tb-disabled' : ''}`} title={sosLayout || chainLayout ? 'These options apply to the diagram view' : undefined}>
         <label>
           Group topics
           <select value={ui.collapseBy} onChange={(e) => setUi({ collapseBy: e.target.value as CollapseBy })}>

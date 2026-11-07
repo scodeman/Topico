@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type DragEvent, type MouseEvent, type Reac
 import { groupTopicId } from '../engine/view';
 import { canMoveSystem, topicOrderState, type MoveTarget } from '../model/ops';
 import { useStore } from '../model/store';
-import { SIDES, SIDE_LABEL, effectiveSide, type Side, type SystemNode } from '../model/types';
+import { SIDES, SIDE_LABEL, SOS_ROLE_LABEL, effectiveSide, type Side, type SosRole, type SystemNode } from '../model/types';
 
 type ItemRef = { kind: 'centre' } | { kind: 'system' | 'topic' | 'group'; id: string };
 
@@ -29,6 +29,8 @@ export function Explorer() {
   const q = query.trim().toLowerCase();
   const match = (name: string) => !q || name.toLowerCase().includes(q);
   const focusId = ui.focus && 'id' in ui.focus ? ui.focus.id : ui.focus?.kind;
+  // In the System of System view, each system row shows its SoS role and lets the user change it.
+  const sosMode = ui.view === 'sos' && !ui.chainView;
 
   const openMenu = (item: ItemRef) => (e: MouseEvent) => {
     e.preventDefault();
@@ -108,6 +110,7 @@ export function Explorer() {
           onToggleHidden={() => st().updateSystem(s.id, { hidden: !s.hidden })}
           {...renameProps({ kind: 'system', id: s.id })}
           {...systemDnd(s)}
+          extra={sosMode && <SosRoleButton role={s.sos} onChange={(sos) => st().updateSystem(s.id, { sos })} />}
         />
         {childRows}
       </div>
@@ -169,6 +172,11 @@ export function Explorer() {
             st().clearFilter();
           }}
           {...renameProps({ kind: 'centre' })}
+          extra={
+            sosMode && (
+              <SosRoleButton role={model.centre.sos} allowOuter={false} onChange={(sos) => st().updateCentre({ sos: sos as 'inner' | 'none' })} />
+            )
+          }
         />
         {SIDES.map((side) => {
           const roots = model.systems.filter(
@@ -244,7 +252,7 @@ export function Explorer() {
                     type === 'chain' && (
                       <button
                         className={`view-btn${viewing ? ' on' : ''}`}
-                        onClick={() => st().setUi({ chainView: viewing ? null : g.id })}
+                        onClick={() => st().setUi({ chainView: viewing ? null : g.id, view: 'diagram' })}
                         title={viewing ? 'Back to the diagram' : 'Show this chain as a broker tube'}
                         aria-pressed={viewing}
                       >
@@ -260,6 +268,8 @@ export function Explorer() {
                   onClick={() => st().setFocus({ kind: 'group', id: g.id })}
                   checked={ui.filterTopics.includes(filterId)}
                   onCheck={() => st().filterOn('topic', filterId, true)}
+                  hidden={g.hidden}
+                  onToggleHidden={() => st().updateGroup(g.id, { hidden: !g.hidden })}
                   {...renameProps({ kind: 'group', id: g.id })}
                 />
               );
@@ -327,6 +337,12 @@ function ContextMenu({ menu, onClose, onRename }: { menu: MenuState; onClose(): 
     else st().deleteGroup(item.id);
   };
   const isCentre = item.kind === 'centre';
+  const sosRole: SosRole | null =
+    item.kind === 'centre' ? model.centre.sos : item.kind === 'system' ? (model.systems.find((s) => s.id === item.id)?.sos ?? null) : null;
+  const setRole = (sos: SosRole) => {
+    if (item.kind === 'centre') st().updateCentre({ sos: sos as 'inner' | 'none' });
+    else if (item.kind === 'system') st().updateSystem(item.id, { sos });
+  };
 
   // Keep the menu inside the window.
   const x = Math.min(menu.x, window.innerWidth - 190);
@@ -337,6 +353,19 @@ function ContextMenu({ menu, onClose, onRename }: { menu: MenuState; onClose(): 
       <button onClick={run(onRename)}>Rename<span className="cm-hint">double-click</span></button>
       <button onClick={run(duplicate)} disabled={isCentre} title={isCentre ? 'There is only one broker' : undefined}>Duplicate</button>
       <button className="danger" onClick={run(remove)} disabled={isCentre} title={isCentre ? 'The broker cannot be deleted' : undefined}>Delete</button>
+      {sosRole && (
+        <>
+          <div className="cm-title">System of System</div>
+          {(['inner', 'outer', 'none'] as SosRole[])
+            .filter((r) => !(isCentre && r === 'outer'))
+            .map((r) => (
+              <button key={r} onClick={run(() => setRole(r))}>
+                {SOS_ROLE_LABEL[r]}
+                <span className="cm-hint">{sosRole === r ? '✓' : ''}</span>
+              </button>
+            ))}
+        </>
+      )}
     </div>
   );
 }
@@ -352,6 +381,23 @@ function SortButton() {
   return (
     <button className={`sort-btn${state ? ' on' : ''}`} onClick={() => sortTopics(next)} title={`${now}. Click to sort ${next === 'asc' ? 'A–Z' : 'Z–A'}.`}>
       {label}
+    </button>
+  );
+}
+
+const ROLE_SHORT: Record<SosRole, string> = { inner: 'Inner', outer: 'Outer', none: '—' };
+
+/** Cycles a system's SoS role: Inner → Outer → Not shown (the broker: Inner ↔ Not shown). */
+function SosRoleButton({ role, onChange, allowOuter = true }: { role: SosRole; onChange(r: SosRole): void; allowOuter?: boolean }) {
+  const order: SosRole[] = allowOuter ? ['inner', 'outer', 'none'] : ['inner', 'none'];
+  const next = order[(order.indexOf(role) + 1) % order.length];
+  return (
+    <button
+      className={`sos-role sos-${role}`}
+      onClick={() => onChange(next)}
+      title={`System of System: ${SOS_ROLE_LABEL[role]}. Click for ${SOS_ROLE_LABEL[next]}.`}
+    >
+      {ROLE_SHORT[role]}
     </button>
   );
 }

@@ -15,8 +15,11 @@ import {
   type Group,
   type GroupType,
   type Interaction,
+  defaultSosRole,
   type Model,
   type NodeKind,
+  type SosCalloutOptions,
+  type SosSettings,
   type Side,
   type SystemNode,
   type Topic,
@@ -38,8 +41,10 @@ export interface UiState {
   showStubs: boolean;
   sketchExport: boolean;
   hoverTopic: string | null;
-  /** Chain shown in the broker-tube view, or null for the normal diagram. */
+  /** Chain shown in the broker-tube view, or null. Takes precedence over `view`. */
   chainView: string | null;
+  /** Main canvas: the broker diagram or the System of System view. */
+  view: 'diagram' | 'sos';
 }
 
 const GROUP_COLORS = ['#0ea5e9', '#f97316', '#a855f7', '#22c55e', '#ef4444', '#eab308', '#14b8a6', '#ec4899'];
@@ -49,6 +54,7 @@ interface Store {
   ui: UiState;
   setModel(m: Model): void;
   updateCentre(patch: Partial<Centre>): void;
+  updateSosSettings(patch: Partial<Omit<SosSettings, 'callouts'>> & { callouts?: Partial<SosCalloutOptions> }): void;
   addSystem(init?: { kind?: NodeKind; side?: Side; parentId?: string | null }): string;
   updateSystem(id: string, patch: Partial<SystemNode>): void;
   deleteSystem(id: string): void;
@@ -88,6 +94,7 @@ const initialUi: UiState = {
   sketchExport: false,
   hoverTopic: null,
   chainView: null,
+  view: 'diagram',
 };
 
 const toggle = (list: string[], id: string) => (list.includes(id) ? list.filter((x) => x !== id) : [...list, id]);
@@ -104,6 +111,11 @@ export const useStore = create<Store>()(
           s.ui = { ...initialUi, sketchExport: s.ui.sketchExport };
         }),
       updateCentre: (patch) => set((s) => void Object.assign(s.model.centre, patch)),
+      updateSosSettings: ({ callouts, ...rest }) =>
+        set((s) => {
+          Object.assign(s.model.sos, rest);
+          if (callouts) Object.assign(s.model.sos.callouts, callouts);
+        }),
 
       addSystem: (init = {}) => {
         const id = newId(init.kind === 'etl' ? 'x' : 's');
@@ -120,6 +132,8 @@ export const useStore = create<Store>()(
             owner: '',
             properties: [],
             hidden: false,
+            sos: defaultSosRole(init.kind ?? 'system'),
+            notes: '',
           });
           s.ui.focus = { kind: 'system', id };
         });
@@ -210,6 +224,7 @@ export const useStore = create<Store>()(
             type,
             color: GROUP_COLORS[n % GROUP_COLORS.length],
             description: '',
+            hidden: false,
           });
           s.ui.focus = { kind: 'group', id };
         });

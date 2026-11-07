@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Version | 0.9 |
+| Version | 0.14 |
 | Last updated | 2026-11-07 |
 | Reference material | [`images/`](images/) (hand-drawn target views), [`Topico.drawio`](Topico.drawio) (source sketch) |
 
@@ -36,6 +36,8 @@ Topico draws the systems that produce and consume topics around a central broker
 | **Endpoint** | One system or ETL producing or consuming one topic. Same as an interaction. |
 | **Bundle** | A named group of **whole topics** that belong together, for example "Reference data". Every endpoint of a bundled topic is in the bundle. |
 | **Chain** (topic chain) | A named group of **individual endpoints** that make up one business flow, for example "Order flow". A topic can be in a chain at some systems and outside it at others, and an endpoint can be in several chains. |
+| **System of System (SoS) view** | A view of the landscape as a central "System of System" box holding the **inner** systems, with the **outer** systems arranged around it like the petals of a flower. |
+| **SoS role** | Per system: **Inner** (inside the SoS box), **Outer** (around it) or **Not shown**. The broker is Inner by default. |
 | **Focus / filter** | The current selection that limits what the diagram shows. |
 
 ## 3. Reference views
@@ -48,6 +50,7 @@ Topico draws the systems that produce and consume topics around a central broker
 | [MULTI_SYS.png](images/MULTI_SYS.png) | Two systems selected (West Sys 11 and North Sys 1). |
 | [TOPICS.png](images/TOPICS.png) | One topic selected (Topic 3). |
 | [CHAIN.png](images/CHAIN.png) | Chain view: one chain drawn around the broker as a horizontal tube. |
+| [SOS.png](images/SOS.png) | System of System view: inner systems in a central box, outer systems around it with note callouts. |
 
 The built-in sample model (toolbar button **Sample**) recreates ALL.png.
 
@@ -116,6 +119,7 @@ The built-in sample model (toolbar button **Sample**) recreates ALL.png.
 | GRP-09 | In the chain view, the broker is drawn as a horizontal tube, and each topic of the chain is a bar inside it. Only the chain's endpoints are shown. | Done (tested) | Bars span from the leftmost to the rightmost system they connect, reaching the tube's end for West/East systems. Overlapping bars are packed into separate lanes. Hidden systems, topics and interactions are left out. |
 | GRP-10 | In the chain view, systems sit around the tube on their border: North above, South below, West left, East right. Arrows go from producers into the bar and from the bar to consumers. | Done (tested) | Upstream systems and ETLs stack outside their parent, with a relay arrow labelled with the topic. West/East systems are ordered by the bars they connect to, so their arrows do not cross. Clicking a system or bar opens its details, and hovering a bar highlights its arrows. |
 | GRP-11 | The chain view can be exported as SVG and draw.io. | Done | The broker tube is draw.io's horizontal cylinder ("Direct data") shape. The draw.io output was checked to be well formed but not yet opened in draw.io. |
+| GRP-12 | The colouring of a bundle or chain can be hidden or shown, like topics and systems, from the left panel or the legend. | Done (tested) | ●/◌ on the group's row in the left panel, a click on the group in the canvas legend, or "Hide colouring" in the group pane. A hidden bundle loses its outline. A hidden chain's tabs and arrows go back to the default colour, also in the chain view and the exports. Topics, endpoints and flows stay, and grouping (collapse) still works. Hidden groups are struck through in the legend. |
 | GRP-07 | Files saved by earlier versions still load. | Done (tested) | A chain stored on a topic (v0.1) is copied to every endpoint of that topic. A single chain stored on an endpoint (v0.2–0.5) becomes a one-item chain list. |
 
 ### 4.6 Automatic layout
@@ -154,7 +158,22 @@ The built-in sample model (toolbar button **Sample**) recreates ALL.png.
 | DET-04 | Clicking the broker or a group opens its details. | Done | |
 | DET-05 | A single click opens details without changing the view. | Done | **Design decision**: click opens details, double-click focuses the view. |
 
-### 4.9 Export and persistence
+### 4.9 System of System view
+
+| ID | Requirement | Status | Notes |
+|---|---|---|---|
+| SOS-01 | Each system can be set as **Inner**, **Outer** or **Not shown** in the SoS view. The broker is Inner by default. | Done (tested) | Set it in the system pane, in the right-click menu, or with the role button that each system row shows while the SoS view is on (click to cycle). The broker can be Inner or Not shown. **Defaults:** only the broker is Inner. Systems (parents and leaves) are Outer, and ETLs are Not shown. These apply to new systems, to the sample, and to older files without SoS roles. Callouts show notes only by default. |
+| SOS-02 | A toolbar switch shows the SoS view (SOS.png): a central "System of System" box holding the inner systems. | Done | **Diagram / System of System** switch. The box title can be edited in the SoS settings bar. |
+| SOS-03 | Outer systems are arranged around the SoS box like the petals of a flower. | Done (tested) | They are spread evenly all around the box, and the ring is rotated so each one stays as close as possible to its border (North at the top, and so on). The ring grows until no petal overlaps another. |
+| SOS-04 | A parent can be left out while its leaf is shown, or the leaves left out while the parent is shown. A parent can also be inside with some of its leaves while its other leaves are outside. | Done (tested) | Each system has its own role. A parent is drawn as a frame around the shown descendants that share its role. Descendants with another role are drawn on their own, inside or around the box, and the flows between them and the parent are drawn like any other. |
+| SOS-05 | Arrows show the topics exchanged, labelled with the topic list. | Done (tested) | Between inner systems: one arrow per direction. Between an outer system and the SoS: one arrow into and/or one out of the box. Flows pass through systems that are not shown, so West Sys 2.1 → West Sys 2 (not shown) → West Sys 11 is drawn as West Sys 2.1 → West Sys 11. Long lists are shortened ("TOPIC 1, TOPIC 2 +3"), with the full list as a tooltip. |
+| SOS-06 | Each outer system has a note callout showing its notes, description, selected properties and/or topics. | Done (tested) | The SoS settings bar chooses what callouts show. Properties can be limited to a list of keys. Each system has a Notes field for this. Systems with nothing to show have no callout. A frame's callout also covers its nested systems. |
+| SOS-07 | The SoS view can be exported as SVG and draw.io. | Done | In draw.io the SoS box and parent frames are swimlanes, and callouts are notes linked to their system. Well-formed XML, not yet opened in draw.io. |
+| SOS-08 | Arrows between inner systems avoid crossing other boxes. | Partial | With the broker shown, inside lines form a star around it and do not cross other boxes. Without it, direct lines are straight and can cross a box lying between two systems. |
+| SOS-09 | The topic lines inside the SoS box can be switched on and off. | Done (tested) | **Inside lines** checkbox in the SoS settings bar, saved with the model. Lines between outer systems and the box are always shown. |
+| SOS-10 | When the broker is shown, all inside topic lines go through it. | Done (tested) | The broker is placed in the middle of the box, with the other inner systems in a ring around it, oriented by border like the outer flower. Each inner system has one line to the broker for what it publishes to other shown systems, inside or outside the box, and one line from it for what it reads. When the broker is not shown, inside lines go directly between systems, laid out in a grid. |
+
+### 4.10 Export and persistence
 
 | ID | Requirement | Status | Notes |
 |---|---|---|---|
@@ -176,6 +195,7 @@ The built-in sample model (toolbar button **Sample**) recreates ALL.png.
 | NFR-04 | The data model is a plain JSON document that can be edited by hand and put under version control. | Done | |
 | NFR-05 | Can be hosted as a static site on GitLab Pages, built and published by CI from the default branch. | Done (tested) | The pipeline was run locally with `gitlab-ci-local` in a `node:22` Linux container, and both jobs passed. Not yet run on a real GitLab instance. |
 | NFR-06 | Can be hosted as a static site on GitHub Pages, built and published by GitHub Actions from the default branch. | Done (partly tested) | The `test` job was run locally with `act` (Ubuntu container) and passed. The build commands are the same ones checked in the GitLab run. The `configure-pages` and `deploy` steps need GitHub itself and have not been run. |
+| NFR-07 | Dependency updates are automated on GitHub. | Done | `.github/dependabot.yml` covers npm packages and GitHub Actions on a weekly schedule. Minor and patch updates are grouped, and each major update gets its own pull request. Every update pull request is tested by CI. The file was checked against the official Dependabot schema, but has not yet run on GitHub. GitLab is not covered. |
 
 ## 6. User interface
 
@@ -215,6 +235,11 @@ The original request did not settle these points. They were decided during the i
 12. **The topic order only affects lists, not the canvas.** On the canvas, tabs are still ordered to reduce crossing arrows (LAY-04). The order is saved in the model file. The sort indicator is worked out from the list itself and is not stored, so it always matches what is shown. Sorting is a one-off action: new or renamed topics are not re-sorted automatically.
 13. **Terminology:** groups of endpoints are called **chains** (topic chains), not "functional chains". Processing jobs are called **ETLs**, not "exe" or "executable". Files that use the old `exe` kind are converted to `etl` when loaded.
 14. **In the chain view, West/East systems are ordered for readability**, by the bars they connect to, rather than in the left-panel order. North/South systems keep the left-panel order. The chain view is not a filtered diagram: the focus, grouping and off-view-flow settings do not apply to it.
+15. **SoS flows and callouts:**
+    - A flow between two outer systems goes through the broker. When the broker is in the box, the flow is drawn as a line into the box from the producer and a line out of it to the consumer. Flows within one outer group (a parent and its framed leaves) are not drawn. When the broker is not shown, flows between outer systems don't cross the SoS and are not drawn.
+    - When the broker is shown, inside lines go through it (SOS-10). Lines to outer systems still stop at the SoS box border, since they enter and leave the SoS through the broker anyway.
+    - Only outer systems have callouts, as in SOS.png.
+    - The chain view, when on, takes precedence over the SoS view.
 
 ## 8. Open questions
 
@@ -227,7 +252,12 @@ The original request did not settle these points. They were decided during the i
 
 | Date | Version | Change |
 |---|---|---|
-| 2026-11-07 | 0.1 | Initial build covering §4.1–4.6 and §4.8–4.9. Reference material moved to `docs/spec/`. |
+| 2026-11-07 | 0.1 | Initial build covering §4.1–4.6, §4.8 and §4.10. Reference material moved to `docs/spec/`. |
+| 2026-11-07 | 0.14 | Automated dependency updates with GitHub Dependabot (NFR-07). |
+| 2026-11-07 | 0.13 | Bundle and chain colouring can be hidden from the left panel, the legend or the group pane (GRP-12). The content stays. |
+| 2026-11-07 | 0.12 | SoS defaults: only the broker inside, systems outside, ETLs not shown, callouts showing notes (SOS-01). Flows between outer systems are drawn through the box when the broker is in it. Every sample system has a note. |
+| 2026-11-07 | 0.11 | SoS: inside lines can be switched off (SOS-09). With the broker shown, inside lines go through it, and inner systems form a ring around it (SOS-10). |
+| 2026-11-07 | 0.10 | System of System view (SOS-01 to SOS-08): Inner/Outer/Not shown role per system, a flower arrangement of outer systems around the SoS box, flows through systems that are not shown, configurable note callouts, and SVG and draw.io export. |
 | 2026-11-07 | 0.9 | Chain view: broker-tube layout for one chain, toggled from the left panel, with SVG and draw.io export (GRP-08 to GRP-11). Terminology: "functional chain" becomes "chain", and "exe/executable" becomes "ETL" (decision 13). |
 | 2026-11-07 | 0.8 | GitHub Pages: Actions workflow (`.github/workflows/pages.yml`) (NFR-06). |
 | 2026-11-07 | 0.7 | GitLab Pages: CI pipeline (`.gitlab-ci.yml`) and relative asset paths (NFR-05). |

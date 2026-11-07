@@ -1,0 +1,42 @@
+# Automated dependency updates (GitHub Dependabot).
+# Every pull request it opens is typechecked and tested by .github/workflows/pages.yml.
+# Minor and patch updates are grouped into one weekly pull request per ecosystem;
+# major updates get their own pull request because they may need code changes.
+
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Australia/Sydney
+    open-pull-requests-limit: 10
+    labels:
+      - dependencies
+    commit-message:
+      prefix: build
+      include: scope # "build(deps): ..." / "build(deps-dev): ..."
+    groups:
+      npm-minor-and-patch:
+        update-types:
+          - minor
+          - patch
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Australia/Sydney
+    labels:
+      - dependencies
+    commit-message:
+      prefix: ci
+      include: scope # "ci(deps): ..."
+    groups:
+      github-actions:
+        patterns:
+          - "*"

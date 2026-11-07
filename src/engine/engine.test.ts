@@ -152,6 +152,42 @@ describe('chains (endpoint membership)', () => {
   });
 });
 
+describe('hiding the colouring of bundles and chains', () => {
+  const render = async (...hidden: string[]) => {
+    const { toSvg, toDrawio } = await import('../export/exporters');
+    const { computeChainLayout } = await import('./chainView');
+    const m = sampleModel();
+    for (const g of m.groups) if (hidden.includes(g.id)) g.hidden = true;
+    const vm = computeView(m, base);
+    const l = layoutView(vm);
+    return { vm, svg: toSvg(l, vm, m.groups, true), drawio: toDrawio(l, vm, m.groups, { sketch: false, showStubs: true, title: 'x' }), tube: computeChainLayout(m, 'c-order')! };
+  };
+  const ORDER = '#f97316';
+  const REF = '#0ea5e9';
+
+  it('keeps every topic and endpoint: only the colouring changes', async () => {
+    const shown = await render();
+    const hidden = await render('b-ref', 'c-order', 'c-billing', 'c-settle');
+    expect(Object.keys(hidden.vm.topics).sort()).toEqual(Object.keys(shown.vm.topics).sort());
+    expect(hidden.vm.edges.length).toBe(shown.vm.edges.length);
+  });
+
+  it('drops a hidden chain colour from tabs and arrows', async () => {
+    expect((await render()).svg).toContain(ORDER);
+    const { svg, drawio, tube } = await render('c-order');
+    expect(svg).not.toContain(ORDER);
+    expect(drawio).not.toContain(ORDER.slice(1));
+    expect(tube.color).not.toBe(ORDER);
+  });
+
+  it('drops a hidden bundle outline', async () => {
+    expect((await render()).svg).toContain(REF);
+    const { svg, drawio } = await render('b-ref');
+    expect(svg).not.toContain(REF);
+    expect(drawio).not.toContain(REF.slice(1));
+  });
+});
+
 describe('layoutView', () => {
   const scenarios: Partial<ViewOptions>[] = [
     {},

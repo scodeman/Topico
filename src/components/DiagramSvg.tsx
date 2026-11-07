@@ -44,7 +44,8 @@ const truncate = (s: string, max: number) => (s.length > max ? `${s.slice(0, Mat
 
 export function DiagramSvg(p: DiagramProps) {
   const { layout, vm, groups, handlers, animate } = p;
-  const groupColor = new Map(groups.map((g) => [g.id, g.color]));
+  // Hidden groups lose their colouring: no chain colour, no bundle outline.
+  const groupColor = new Map(groups.filter((g) => !g.hidden).map((g) => [g.id, g.color]));
   const chainColor = (chainId: string | null | undefined) => (chainId ? groupColor.get(chainId) : undefined);
   const active = p.hoverTopic ?? null;
   const dim = (topicId: string) => (active && active !== topicId ? 0.12 : 1);
@@ -214,7 +215,7 @@ export function DiagramSvg(p: DiagramProps) {
 
       {layout.nodes.flatMap((n) => n.tabs.map(tab))}
 
-      {layout.brackets.map((br) => (
+      {layout.brackets.filter((br) => groupColor.has(br.groupId)).map((br) => (
         <rect
           key={br.key}
           x={br.rect.x}
@@ -223,7 +224,7 @@ export function DiagramSvg(p: DiagramProps) {
           height={br.rect.h}
           rx={4}
           fill="none"
-          stroke={groupColor.get(br.groupId) ?? COLORS.muted}
+          stroke={groupColor.get(br.groupId)}
           strokeWidth={2}
           pointerEvents="none"
         />

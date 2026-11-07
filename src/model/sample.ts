@@ -1,9 +1,29 @@
-import type { Direction, Model, NodeKind, Side, SystemNode, Topic } from './types';
+import { defaultSosRole, defaultSosSettings, type Direction, type Model, type NodeKind, type Side, type SystemNode, type Topic } from './types';
 
 /** Recreates the landscape sketched in docs/spec/images/ALL.png. */
 export function sampleModel(): Model {
+  // SoS roles use the defaults: only the broker inside, every system (parent or leaf) outside, ETLs not shown.
+  // Each system has a note so the SoS callouts have something to show.
+  const notes: Record<string, string> = {
+    n1: 'Order capture: publishes new orders and reference updates.',
+    n2: 'Pricing engine, feeds the billing chain.',
+    n3: 'Reporting: reads pricing and catalogue topics.',
+    n21: 'Nightly batch, enriches TOPIC 6 into TOPIC 8.',
+    w11: 'Master of the reference data (topics 1-4).',
+    w2: 'Fulfilment hub, aggregates regional stock.',
+    w21: 'Warehouse A stock feed.',
+    w22: 'Warehouse B stock feed.',
+    xw1: 'Converts orders (TOPIC 5) into shipments (TOPIC 10).',
+    e1: 'Billing platform, fans invoices out to regional systems.',
+    e11: 'Regional billing for zone 1.',
+    e12x: 'Regional billing for zone 2.',
+    e13: 'Regional billing for zone 3.',
+    e12: 'Customer portal: shows orders, invoices and payments.',
+    s1: 'Data lake: archives every topic.',
+  };
   const sys = (id: string, name: string, side: Side, parentId: string | null = null, kind: NodeKind = 'system'): SystemNode => ({
     id, name, kind, side, parentId, description: '', owner: '', properties: [], hidden: false,
+    sos: defaultSosRole(kind), notes: notes[id] ?? '',
   });
   const systems: SystemNode[] = [
     sys('n1', 'NORTH SYS 1', 'N'),
@@ -75,15 +95,16 @@ export function sampleModel(): Model {
 
   return {
     version: 1,
-    centre: { id: 'centre', name: 'CENTER SYS', description: 'Central brokering system', properties: [] },
+    centre: { id: 'centre', name: 'CENTER SYS', description: 'Central brokering system', properties: [], sos: 'inner' },
+    sos: defaultSosSettings(),
     systems,
     topics,
     interactions,
     groups: [
-      { id: bundleRef, name: 'Reference data', type: 'bundle', color: '#0ea5e9', description: '' },
-      { id: chainOrder, name: 'Order flow', type: 'chain', color: '#f97316', description: '' },
-      { id: chainBilling, name: 'Billing', type: 'chain', color: '#a855f7', description: '' },
-      { id: chainSettle, name: 'Settlement', type: 'chain', color: '#16a34a', description: '' },
+      { id: bundleRef, name: 'Reference data', type: 'bundle', color: '#0ea5e9', description: '', hidden: false },
+      { id: chainOrder, name: 'Order flow', type: 'chain', color: '#f97316', description: '', hidden: false },
+      { id: chainBilling, name: 'Billing', type: 'chain', color: '#a855f7', description: '', hidden: false },
+      { id: chainSettle, name: 'Settlement', type: 'chain', color: '#16a34a', description: '', hidden: false },
     ],
   };
 }
