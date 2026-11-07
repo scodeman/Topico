@@ -1,15 +1,47 @@
 # Topico
 
-Diagram topic producers and consumers around a central brokering system.
+**Draw who publishes and who reads each topic around your message broker, then explore it from every angle.**
 
-Requirements, their status and the design decisions are tracked in [docs/spec/SPEC.md](docs/spec/SPEC.md). The reference sketches are in [docs/spec/images](docs/spec/images).
+Topico places your systems around a central broker, draws the topics they exchange, and keeps the diagram readable as you focus, group, hide or animate parts of it. Everything runs in the browser: no server, no account.
+
+[![Pages](https://github.com/scodeman/topico/actions/workflows/pages.yml/badge.svg)](https://github.com/scodeman/topico/actions/workflows/pages.yml)
+
+### ▶ [Open the app](https://scodeman.github.io/Topico/)
+
+It starts with a sample landscape you can play with straight away.
+
+[![Topico: systems around the central broker, with the topic editor open](docs/images/app.png)](https://scodeman.github.io/Topico/)
+
+## A quick tour
+
+### Focus on what matters
+Double-click a system or a topic, or tick it in the left panel, to keep only what relates to it. The layout shrinks to fit. Dashed arrows show flows that continue outside the focus.
+
+<img src="docs/images/focus.png" alt="Focused view: WEST SYS 11 and NORTH SYS 1 with the four topics they exchange" width="560">
+
+### Follow a chain and replay it step by step
+Group the endpoints of a business flow into a **chain**, number its links in a **sequence**, and press ▶. The chain lights up step by step, on the diagram or in its **tube view**, where the broker is drawn as a pipe.
+
+<img src="docs/images/chain-animation.gif" alt="Animation of the Billing chain in the tube view, step 1 to 3" width="560">
+
+### See the System of System
+Switch the toolbar to **System of System**. Inner systems sit in a central box and outer systems surround it like petals, each with its notes. Arrows list the topics that go in and out.
+
+[![System of System view](docs/images/sos.png)](https://scodeman.github.io/Topico/)
+
+### Take it with you
+Export any view, including a focused view, the chain tube or the SoS view, to **SVG** or **draw.io**. While a chain is animating, the draw.io file has one page per step, with draw.io's own flow animation.
+
+## Run it locally
 
 ```bash
 npm install
 npm run dev        # http://localhost:5173
-npm test           # engine tests (filtering, grouping, layout overlap)
+npm test           # engine tests (filtering, grouping, layouts, sequences)
 npm run build
 ```
+
+Requirements, their status and the design decisions are tracked in [docs/spec/SPEC.md](docs/spec/SPEC.md). The original sketches are in [docs/spec/images](docs/spec/images).
 
 ## Model
 
@@ -26,7 +58,7 @@ Arrows are derived automatically. Inside each container (the broker or a system)
 
 The model is saved automatically in the browser (localStorage). Use **Save JSON** and **Open…** to keep files.
 
-## Using the views
+## How to
 
 - **Click** a system, topic or the broker to edit it in the right pane. The system pane lists its produced and consumed topics, each with editable details.
 - **Double-click** a system or topic to focus the view on it. **Shift+double-click** adds more. You can also use the checkboxes in the left panel.
@@ -98,6 +130,10 @@ Dependabot starts working as soon as this file is on the default branch of a Git
 
 - `src/model`: types, sample data (based on `docs/spec/images/ALL.png`) and the Zustand store.
 - `src/engine/view.ts`: hiding, filtering, grouping, logical arrows and off-view stubs.
+- `src/model/chainLinks.ts`: links of a chain and its sequence (including Auto-fill).
 - `src/engine/layout.ts`: geometry. It places nodes recursively per border and reorders tabs with a barycentre pass.
-- `src/export`: SVG and draw.io exporters.
-- `src/components`: toolbar, explorer (left), canvas, details pane (right).
+- `src/engine/chainView.ts`, `src/engine/sosView.ts`: the chain (tube) and System of System layouts.
+- `src/engine/animation.ts`: maps a chain sequence onto the arrows of each view.
+- `src/export`: SVG and draw.io exporters, including multi-page animated draw.io files.
+- `src/components`: toolbar, explorer (left), canvas, details pane (right), and the animation player.
+- `docs/images`: the screenshots used in this README.

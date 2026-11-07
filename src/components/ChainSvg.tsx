@@ -77,7 +77,7 @@ export function ChainSvg(p: ChainSvgProps) {
           <stop offset="0" stopColor="#94a3b8" />
           <stop offset="1" stopColor="#f1f5f9" />
         </linearGradient>
-        <marker id={markerId} viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <marker id={markerId} viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto-start-reverse">
           <path d="M0,0 L10,5 L0,10 z" fill={color} />
         </marker>
       </defs>

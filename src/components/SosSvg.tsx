@@ -81,7 +81,7 @@ export function SosSvg(p: SosSvgProps) {
       {...p.svgProps}
     >
       <defs>
-        <marker id="sos-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <marker id="sos-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto-start-reverse">
           <path d="M0,0 L10,5 L0,10 z" fill={ARROW} />
         </marker>
       </defs>

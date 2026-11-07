@@ -148,11 +148,11 @@ export function DiagramSvg(p: DiagramProps) {
     >
       <defs>
         {edgeColors.map((c) => (
-          <marker key={c} id={markerId(c)} viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <marker key={c} id={markerId(c)} viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto-start-reverse">
             <path d="M0,0 L10,5 L0,10 z" fill={c} />
           </marker>
         ))}
-        <marker id="arrow-muted" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <marker id="arrow-muted" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto-start-reverse">
           <path d="M0,0 L10,5 L0,10 z" fill={COLORS.muted} />
         </marker>
       </defs>
