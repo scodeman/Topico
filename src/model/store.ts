@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { immer } from 'zustand/middleware/immer';
+import type { TopicTextMode } from '../engine/layout';
 import type { CollapseBy } from '../engine/view';
 import { duplicateGroup, duplicateSystem, duplicateTopic, moveSystem, moveTopic, sortTopics, type MoveTarget, type SortDir } from './ops';
 import { sampleModel } from './sample';
@@ -47,6 +48,8 @@ export interface UiState {
   view: 'diagram' | 'sos';
   /** Chain sequence being animated (step is 1-based), or null. */
   animation: { chainId: string; step: number; playing: boolean } | null;
+  /** How topic names longer than their box are shown. */
+  topicText: TopicTextMode;
   /** Side panels: width in pixels, and whether they are collapsed. */
   explorerWidth: number;
   explorerCollapsed: boolean;
@@ -103,6 +106,7 @@ const initialUi: UiState = {
   chainView: null,
   view: 'diagram',
   animation: null,
+  topicText: 'scroll',
   explorerWidth: 260,
   explorerCollapsed: false,
   detailsWidth: 340,
@@ -121,8 +125,8 @@ export const useStore = create<Store>()(
         set((s) => {
           s.model = normalizeModel(m);
           // A new model resets the view, not the user's panel layout or export preference.
-          const { sketchExport, explorerWidth, explorerCollapsed, detailsWidth, detailsCollapsed } = s.ui;
-          s.ui = { ...initialUi, sketchExport, explorerWidth, explorerCollapsed, detailsWidth, detailsCollapsed };
+          const { sketchExport, topicText, explorerWidth, explorerCollapsed, detailsWidth, detailsCollapsed } = s.ui;
+          s.ui = { ...initialUi, sketchExport, topicText, explorerWidth, explorerCollapsed, detailsWidth, detailsCollapsed };
         }),
       updateCentre: (patch) => set((s) => void Object.assign(s.model.centre, patch)),
       updateSosSettings: ({ callouts, ...rest }) =>

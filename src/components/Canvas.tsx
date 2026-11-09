@@ -1,10 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from 'react';
+import { dropTargetAt, type DiagramDrop } from '../engine/dropTarget';
 import { useView } from '../engine/useView';
+import { canMoveSystem } from '../model/ops';
 import { CENTRE_ID } from '../model/types';
 import { useStore } from '../model/store';
 import { AnimationBar } from './AnimationBar';
 import { ChainSvg, type ChainHandlers } from './ChainSvg';
-import { DiagramSvg, type DiagramHandlers } from './DiagramSvg';
+import type { Layout } from '../engine/layout';
+import { COLORS, DiagramSvg, type DiagramHandlers } from './DiagramSvg';
 import { SosBar } from './SosBar';
 import { SosSvg, type SosHandlers } from './SosSvg';
 
@@ -20,6 +23,7 @@ export function Canvas() {
   const setFocus = useStore((s) => s.setFocus);
   const filterOn = useStore((s) => s.filterOn);
   const setUi = useStore((s) => s.setUi);
+  const moveSystem = useStore((s) => s.moveSystem);
   const wrapRef = useRef<HTMLDivElement>(null);
   const bounds = chainLayout?.bounds ?? sosLayout?.bounds ?? layout.bounds;
   const [box, setBox] = useState<Box>(bounds);
@@ -51,11 +55,46 @@ export function Canvas() {
     return () => el.removeEventListener('wheel', onWheel);
   }, []);
 
+  // Dragging a system on the diagram: same move as in the left panel.
+  const nodeDrag = useRef<{ id: string; x: number; y: number; active: boolean } | null>(null);
+  const justDragged = useRef(false);
+  const [sysDrag, setSysDrag] = useState<{ id: string; at: { x: number; y: number }; drop: DiagramDrop | null } | null>(null);
+  const toDiagram = (e: MouseEvent) => {
+    const rect = wrapRef.current!.getBoundingClientRect();
+    const scale = Math.max(box.w / rect.width, box.h / rect.height);
+    // Account for preserveAspectRatio="xMidYMid meet" letterboxing.
+    return {
+      x: box.x - (rect.width * scale - box.w) / 2 + (e.clientX - rect.left) * scale,
+      y: box.y - (rect.height * scale - box.h) / 2 + (e.clientY - rect.top) * scale,
+    };
+  };
+  const dropAt = (id: string, at: { x: number; y: number }) => dropTargetAt(layout, vm.roots, id, at, (sid, target) => canMoveSystem(model, sid, target));
+
+  useEffect(() => {
+    if (!sysDrag) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      nodeDrag.current = null;
+      setSysDrag(null);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [sysDrag]);
+
   const onMouseDown = (e: MouseEvent) => {
-    if (e.button !== 0) return;
+    // A press on a system was already taken by its own handler.
+    if (e.button !== 0 || nodeDrag.current) return;
     drag.current = { x: e.clientX, y: e.clientY, box, moved: false };
   };
   const onMouseMove = (e: MouseEvent) => {
+    const nd = nodeDrag.current;
+    if (nd) {
+      if (!nd.active && Math.abs(e.clientX - nd.x) + Math.abs(e.clientY - nd.y) <= 5) return;
+      nd.active = true;
+      const at = toDiagram(e);
+      setSysDrag({ id: nd.id, at, drop: dropAt(nd.id, at) });
+      return;
+    }
     const d = drag.current;
     const el = wrapRef.current;
     if (!d || !el) return;
@@ -67,9 +106,23 @@ export function Canvas() {
     if (d.moved) setBox({ ...d.box, x: d.box.x - dx * scale, y: d.box.y - dy * scale });
   };
   const endDrag = () => {
-    setTimeout(() => (drag.current = null), 0);
+    // The drag ends now: the browser can fire a mouse-move right after the release (boxes moved under the pointer),
+    // and it must not restart anything. Only a flag remains, for the click event that follows.
+    justDragged.current = !!drag.current?.moved || !!nodeDrag.current?.active;
+    drag.current = null;
+    nodeDrag.current = null;
+    setSysDrag(null);
+    setTimeout(() => (justDragged.current = false), 0);
   };
-  const wasDrag = () => !!drag.current?.moved;
+  const onMouseUp = (e: MouseEvent) => {
+    const nd = nodeDrag.current;
+    if (nd?.active) {
+      const drop = dropAt(nd.id, toDiagram(e));
+      if (drop) moveSystem(nd.id, drop.target);
+    }
+    endDrag();
+  };
+  const wasDrag = () => justDragged.current;
 
   const handlers: DiagramHandlers = useMemo(
     () => ({
@@ -92,6 +145,9 @@ export function Canvas() {
         filterOn('topic', topicId, e.shiftKey || e.metaKey || e.ctrlKey);
       },
       onHoverTopic: (topicId) => setUi({ hoverTopic: topicId }),
+      onNodeMouseDown: (id, e) => {
+        if (e.button === 0) nodeDrag.current = { id, x: e.clientX, y: e.clientY, active: false };
+      },
     }),
     [setFocus, filterOn, setUi],
   );
@@ -128,7 +184,7 @@ export function Canvas() {
   if (focus?.kind === 'group') selectedTopics.add(`grp:${focus.id}`);
 
   return (
-    <div className="canvas" ref={wrapRef} onMouseMove={onMouseMove} onMouseUp={endDrag} onMouseLeave={endDrag}>
+    <div className={`canvas${sysDrag ? ' sys-dragging' : ''}`} ref={wrapRef} onMouseMove={onMouseMove} onMouseUp={onMouseUp} onMouseLeave={endDrag}>
       {sosLayout ? <SosBar /> : <FilterBar />}
       {sosLayout ? (
         <SosSvg
@@ -145,6 +201,7 @@ export function Canvas() {
       ) : chainLayout ? (
         <ChainSvg
           layout={chainLayout}
+          topicText={ui.topicText}
           anim={anim ? { arrowSteps: anim.arrowSteps, current: anim.current } : null}
           selectedNodes={selectedNodes}
           selectedTopics={selectedTopics}
@@ -160,6 +217,7 @@ export function Canvas() {
       ) : (
         <DiagramSvg
           layout={layout}
+          topicText={ui.topicText}
           vm={vm}
           groups={model.groups}
           showStubs={ui.showStubs}
@@ -167,6 +225,7 @@ export function Canvas() {
           selectedTopics={selectedTopics}
           hoverTopic={ui.hoverTopic}
           handlers={handlers}
+          overlay={sysDrag && <DragOverlay layout={layout} drag={sysDrag} />}
           anim={anim ? { edgeSteps: anim.edgeSteps, current: anim.current, color: anim.color } : null}
           animate
           svgProps={{
@@ -188,6 +247,26 @@ export function Canvas() {
         <div className="empty-hint">Add systems and topics from the left panel to start drawing.</div>
       )}
     </div>
+  );
+}
+
+/** Feedback while dragging a system: a ghost following the pointer, and where it would land. */
+function DragOverlay({ layout, drag }: { layout: Layout; drag: { id: string; at: { x: number; y: number }; drop: DiagramDrop | null } }) {
+  const node = layout.nodes.find((n) => n.id === drag.id);
+  if (!node) return null;
+  const { w, h } = node.rect;
+  const m = drag.drop?.marker;
+  return (
+    <g pointerEvents="none">
+      {m?.kind === 'line' && <line x1={m.from.x} y1={m.from.y} x2={m.to.x} y2={m.to.y} stroke={COLORS.accent} strokeWidth={5} strokeLinecap="round" />}
+      {m?.kind === 'box' && <rect x={m.rect.x - 3} y={m.rect.y - 3} width={m.rect.w + 6} height={m.rect.h + 6} rx={4} fill={COLORS.accent} fillOpacity={0.12} stroke={COLORS.accent} strokeWidth={3} strokeDasharray="8 5" />}
+      <g transform={`translate(${drag.at.x - w / 2} ${drag.at.y - h / 2})`} opacity={0.75}>
+        <rect width={w} height={h} rx={3} fill="#dbeafe" stroke={COLORS.accent} strokeWidth={2} strokeDasharray="6 4" />
+        <text x={w / 2} y={h / 2} textAnchor="middle" dominantBaseline="central" fontSize={12} fontWeight={600} fill={COLORS.ink}>
+          {node.name}
+        </text>
+      </g>
+    </g>
   );
 }
 

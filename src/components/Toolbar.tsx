@@ -1,6 +1,7 @@
 import { useRef } from 'react';
 import { useView } from '../engine/useView';
 import { resetToEmpty, resetToSample, useStore } from '../model/store';
+import type { TopicTextMode } from '../engine/layout';
 import type { CollapseBy } from '../engine/view';
 
 export function Toolbar() {
@@ -28,10 +29,10 @@ export function Toolbar() {
     ex.download(
       `${base}${suffix}${animSuffix}.svg`,
       chainLayout
-        ? ex.toChainSvg(chainLayout, anim ? { arrowSteps: anim.arrowSteps, current: anim.current } : null)
+        ? ex.toChainSvg(chainLayout, anim ? { arrowSteps: anim.arrowSteps, current: anim.current } : null, ui.topicText)
         : sosLayout
           ? ex.toSosSvg(sosLayout)
-          : ex.toSvg(layout, vm, model.groups, ui.showStubs, anim ? { edgeSteps: anim.edgeSteps, current: anim.current, color: anim.color } : null),
+          : ex.toSvg(layout, vm, model.groups, ui.showStubs, anim ? { edgeSteps: anim.edgeSteps, current: anim.current, color: anim.color } : null, ui.topicText),
       'image/svg+xml',
     ),
   );
@@ -91,6 +92,16 @@ export function Toolbar() {
           </button>
         </span>
       </div>
+      <div className={`tb-group${sosLayout ? ' tb-disabled' : ''}`} title={sosLayout ? 'This option applies to the diagram and chain views' : undefined}>
+        <label title="How topic names longer than their box are shown">
+          Topic names
+          <select value={ui.topicText} onChange={(e) => setUi({ topicText: e.target.value as TopicTextMode })}>
+            <option value="scroll">rolling</option>
+            <option value="shrink">small font</option>
+            <option value="fit">wider boxes</option>
+          </select>
+        </label>
+      </div>
       <div className={`tb-group${sosLayout || chainLayout ? ' tb-disabled' : ''}`} title={sosLayout || chainLayout ? 'These options apply to the diagram view' : undefined}>
         <label>
           Group topics
@@ -101,14 +112,14 @@ export function Toolbar() {
           </select>
         </label>
         <label title="When several systems are focused, only show topics exchanged between them">
-          <input type="checkbox" checked={ui.sharedOnly} onChange={(e) => setUi({ sharedOnly: e.target.checked })} /> Shared topics only
+          <input type="checkbox" checked={ui.sharedOnly} onChange={(e) => setUi({ sharedOnly: e.target.checked })} /> Shared only
         </label>
         <label title="Dashed arrows show flows to/from systems outside the current focus">
           <input type="checkbox" checked={ui.showStubs} onChange={(e) => setUi({ showStubs: e.target.checked })} /> Off-view flows
         </label>
       </div>
       <div className="tb-group tb-right">
-        <span className="muted">Export view:</span>
+        <span className="muted">Export:</span>
         <button onClick={exportSvg}>SVG</button>
         <button onClick={exportDrawio}>draw.io</button>
         <label title="Use draw.io's hand-drawn sketch style">

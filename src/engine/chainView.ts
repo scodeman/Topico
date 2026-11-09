@@ -1,5 +1,5 @@
 import { descendants, effectiveSide, type Interaction, type Model, type NodeKind, type Side } from '../model/types';
-import type { Rect, Vec } from './layout';
+import { TOPIC_PAD, textWidth, type Rect, type TopicTextMode, type Vec } from './layout';
 
 /**
  * "Broker tube" view of one chain (see docs/spec/images/CHAIN.png):
@@ -84,7 +84,7 @@ const OUT: Record<Side, { axis: 'x' | 'y'; sign: 1 | -1 }> = {
 };
 const r = (v: number) => Math.round(v * 10) / 10;
 
-export function computeChainLayout(model: Model, chainId: string): ChainLayout | null {
+export function computeChainLayout(model: Model, chainId: string, topicText: TopicTextMode = 'scroll'): ChainLayout | null {
   const chain = model.groups.find((g) => g.id === chainId && g.type === 'chain');
   if (!chain) return null;
 
@@ -159,7 +159,11 @@ export function computeChainLayout(model: Model, chainId: string): ChainLayout |
   const rowSpan = (side: Side) => roots[side].reduce((a, id) => a + span.get(id)!, 0) + Math.max(0, roots[side].length - 1) * CK.SIB;
 
   // 4. Horizontal positions first: they decide where topic bars start and end.
-  const tubeW = Math.max(CK.TUBE_MIN_W, rowSpan('N') + 2 * CK.TUBE_PAD_X, rowSpan('S') + 2 * CK.TUBE_PAD_X);
+  // Wider boxes: a topic's bar is at least as long as its name, and the tube can hold it.
+  const barMin = (topicId: string) =>
+    topicText === 'fit' ? Math.max(CK.BAR_MIN, Math.ceil(textWidth(topicById.get(topicId)!.name)) + TOPIC_PAD) : CK.BAR_MIN;
+  const longestBar = Math.max(CK.BAR_MIN, ...endpoints.map((i) => barMin(i.topicId)));
+  const tubeW = Math.max(CK.TUBE_MIN_W, rowSpan('N') + 2 * CK.TUBE_PAD_X, rowSpan('S') + 2 * CK.TUBE_PAD_X, longestBar + 2 * CK.BAR_INSET);
   const rowStart = (side: Side) => (tubeW - rowSpan(side)) / 2;
   const portAlong = (id: string, alongStart: number, k: number) => {
     const side = sideOf.get(id)!;
@@ -189,13 +193,14 @@ export function computeChainLayout(model: Model, chainId: string): ChainLayout |
     let x0 = west ? CK.BAR_INSET : xs.length ? Math.min(...xs) - 30 : tubeW / 2;
     let x1 = east ? tubeW - CK.BAR_INSET : xs.length ? Math.max(...xs) + 30 : tubeW / 2;
     // Keep bars wide enough for their label; anchored ends (West/East) stay put.
-    if (x1 - x0 < CK.BAR_MIN) {
-      if (west && !east) x1 = x0 + CK.BAR_MIN;
-      else if (east && !west) x0 = x1 - CK.BAR_MIN;
+    const min = barMin(topicId);
+    if (x1 - x0 < min) {
+      if (west && !east) x1 = x0 + min;
+      else if (east && !west) x0 = x1 - min;
       else {
         const c = (x0 + x1) / 2;
-        x0 = c - CK.BAR_MIN / 2;
-        x1 = c + CK.BAR_MIN / 2;
+        x0 = c - min / 2;
+        x1 = c + min / 2;
       }
       x0 = Math.max(CK.BAR_INSET, x0);
       x1 = Math.min(tubeW - CK.BAR_INSET, x1);

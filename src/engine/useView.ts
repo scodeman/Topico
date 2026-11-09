@@ -20,9 +20,9 @@ export function useView() {
       }),
     [model, ui.filterSystems, ui.filterTopics, ui.collapseBy, ui.sharedOnly],
   );
-  const layout = useMemo(() => layoutView(vm), [vm]);
+  const layout = useMemo(() => layoutView(vm, ui.topicText), [vm, ui.topicText]);
   // Broker-tube view of one chain, when toggled from the explorer.
-  const chainLayout = useMemo(() => (ui.chainView ? computeChainLayout(model, ui.chainView) : null), [model, ui.chainView]);
+  const chainLayout = useMemo(() => (ui.chainView ? computeChainLayout(model, ui.chainView, ui.topicText) : null), [model, ui.chainView, ui.topicText]);
   // System of System view, when selected in the toolbar (the chain view takes precedence).
   const sosLayout = useMemo(() => (!ui.chainView && ui.view === 'sos' ? computeSosLayout(model) : null), [model, ui.chainView, ui.view]);
   // Chain sequence being animated, mapped onto the diagram's and the tube view's arrows.

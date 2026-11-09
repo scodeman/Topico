@@ -60,6 +60,17 @@ describe('computeChainLayout', () => {
     checkGeometry(l);
   });
 
+  it('extends a bar and the tube to fit a long name in wider-boxes mode', () => {
+    const m = sampleModel();
+    m.topics.find((t) => t.id === 't5')!.name = 'com.company.orders.v1.'.repeat(5);
+    const normal = computeChainLayout(m, 'c-order', 'scroll')!;
+    const wide = computeChainLayout(m, 'c-order', 'fit')!;
+    const bar = (l: ChainLayout) => l.bars.find((b) => b.topicId === 't5')!.rect;
+    expect(bar(wide).w).toBeGreaterThan(bar(normal).w);
+    expect(wide.tube.w).toBeGreaterThanOrEqual(bar(wide).w);
+    checkGeometry(wide);
+  });
+
   it('respects hidden elements and reports an empty chain', () => {
     const m = sampleModel();
     m.systems.find((s) => s.id === 'e1')!.hidden = true;

@@ -19,6 +19,27 @@ export const K = {
   STUB_LEN: 56,
 };
 
+/** How a topic name longer than its box is shown. */
+export type TopicTextMode = 'scroll' | 'shrink' | 'fit';
+
+export const TOPIC_FONT = 10;
+/** Room kept between a topic name and the ends of its box. */
+export const TOPIC_PAD = 12;
+const MIN_TOPIC_FONT = 4;
+
+/** Estimated width of a text, without needing a browser (layouts also run in tests and exports). */
+export function textWidth(text: string, fontSize = TOPIC_FONT): number {
+  let units = 0;
+  for (const c of text) units += /[A-Z0-9#%&@]/.test(c) ? 0.68 : /[il.,:;'|! ()[\]]/.test(c) ? 0.34 : 0.58;
+  return units * fontSize;
+}
+
+/** Largest font (up to the normal size) at which a text fits a box of the given length. */
+export function fitFontSize(text: string, length: number): number {
+  const fit = (TOPIC_FONT * (length - TOPIC_PAD)) / Math.max(1, textWidth(text));
+  return Math.max(MIN_TOPIC_FONT, Math.min(TOPIC_FONT, Math.floor(fit * 2) / 2));
+}
+
 export interface Vec {
   x: number;
   y: number;
@@ -53,6 +74,9 @@ export interface NodeGeom {
   rect: Rect;
   tabs: TabGeom[];
   hasChildren: boolean;
+  /** How far tabs reach into the box from its inner (parent) and outer (children) sides. */
+  innerBand: number;
+  outerBand: number;
 }
 
 export interface EdgeGeom {
@@ -104,20 +128,28 @@ interface Measure {
   span: number;
   depth: number;
   childrenSpan: number;
+  tabLength: number;
+  childTabLength: number;
 }
 
-function measureAll(vm: ViewModel): Map<string, Measure> {
+function measureAll(vm: ViewModel, mode: TopicTextMode): Map<string, Measure> {
   const out = new Map<string, Measure>();
   const visit = (n: ViewNode): Measure => {
     const cached = out.get(n.id);
     if (cached) return cached;
     const kids = n.children.map((c) => visit(vm.nodes[c]));
+    // Wider boxes: all the tabs of a node share the length of its longest name, so they stay aligned.
+    const names = mode === 'fit' ? n.tabs.map((t) => Math.ceil(textWidth(vm.topics[t.topicId]?.name ?? t.topicId)) + TOPIC_PAD) : [];
+    const tabLength = Math.max(K.TAB_L, ...names);
+    const childTabLength = Math.max(K.TAB_L, ...kids.map((k) => k.tabLength));
     const childrenSpan = kids.reduce((a, k) => a + k.span, 0) + Math.max(0, kids.length - 1) * K.SIB_GAP;
     const etl = n.kind === 'etl';
     const tabsSpan = n.tabs.length * K.TAB_T + 2 * (etl ? 8 : K.NODE_PAD);
     const span = Math.max(etl ? K.ETL_MIN_SPAN : K.SYS_MIN_SPAN, tabsSpan, childrenSpan);
     const depth = etl ? K.ETL_DEPTH : kids.length ? K.SYS_DEPTH_WITH_CHILDREN : K.SYS_DEPTH;
-    const m = { span, depth, childrenSpan };
+    // Longer tabs reach further into the box: deepen it by as much, on each side that has tabs.
+    const extra = (tabLength - K.TAB_L) / 2 + (kids.length ? (childTabLength - K.TAB_L) / 2 : 0);
+    const m = { span, depth: depth + extra, childrenSpan, tabLength, childTabLength };
     out.set(n.id, m);
     return m;
   };
@@ -131,11 +163,13 @@ function sideSpan(vm: ViewModel, ms: Map<string, Measure>, side: Side) {
 }
 
 /** Layout a view. `tabOrder` optionally fixes the order of tabs per node. */
-function layoutOnce(vm: ViewModel, tabOrder: Map<string, string[]>): Layout {
-  const ms = measureAll(vm);
+function layoutOnce(vm: ViewModel, tabOrder: Map<string, string[]>, mode: TopicTextMode): Layout {
+  const ms = measureAll(vm, mode);
   const spans = Object.fromEntries(SIDES.map((s) => [s, sideSpan(vm, ms, s)])) as Record<Side, number>;
-  const cw = Math.max(K.CENTRE_MIN_W, spans.N + 2 * K.CENTRE_PAD, spans.S + 2 * K.CENTRE_PAD);
-  const ch = Math.max(K.CENTRE_MIN_H, spans.W + 2 * K.CENTRE_PAD, spans.E + 2 * K.CENTRE_PAD);
+  // Opposite borders must not meet in the middle when their tabs are long.
+  const reach = (side: Side) => Math.max(0, ...vm.roots[side].map((id) => (ms.get(id)!.tabLength - K.GAP) / 2));
+  const cw = Math.max(K.CENTRE_MIN_W, spans.N + 2 * K.CENTRE_PAD, spans.S + 2 * K.CENTRE_PAD, reach('W') + reach('E') + K.CENTRE_PAD * 2);
+  const ch = Math.max(K.CENTRE_MIN_H, spans.W + 2 * K.CENTRE_PAD, spans.E + 2 * K.CENTRE_PAD, reach('N') + reach('S') + K.CENTRE_PAD * 2);
   const centre: Rect = { x: 0, y: 0, w: cw, h: ch };
   const nodes: NodeGeom[] = [];
 
@@ -155,9 +189,9 @@ function layoutOnce(vm: ViewModel, tabOrder: Map<string, string[]>): Layout {
     const vec = (o: number, a: number): Vec => (axis === 'x' ? { x: o, y: a } : { x: a, y: o });
     const tabGeoms: TabGeom[] = tabs.map((t, i) => {
       const a0 = tabStart + i * K.TAB_T;
-      const o0 = gapCentre - K.TAB_L / 2;
+      const o0 = gapCentre - m.tabLength / 2;
       const r: Rect =
-        axis === 'x' ? { x: o0, y: a0, w: K.TAB_L, h: K.TAB_T } : { x: a0, y: o0, w: K.TAB_T, h: K.TAB_L };
+        axis === 'x' ? { x: o0, y: a0, w: m.tabLength, h: K.TAB_T } : { x: a0, y: o0, w: K.TAB_T, h: m.tabLength };
       const am = a0 + K.TAB_T / 2;
       return {
         key: tabKey(n.id, t.topicId),
@@ -167,13 +201,17 @@ function layoutOnce(vm: ViewModel, tabOrder: Map<string, string[]>): Layout {
         chainIds: t.chainIds,
         rect: r,
         vertical: axis === 'y',
-        inner: vec(gapCentre - (sign * K.TAB_L) / 2, am),
-        outer: vec(gapCentre + (sign * K.TAB_L) / 2, am),
+        inner: vec(gapCentre - (sign * m.tabLength) / 2, am),
+        outer: vec(gapCentre + (sign * m.tabLength) / 2, am),
         innerNormal: vec(-sign, 0),
         outerNormal: vec(sign, 0),
       };
     });
-    nodes.push({ id: n.id, name: n.name, kind: n.kind, side, rect, tabs: tabGeoms, hasChildren: n.children.length > 0 });
+    nodes.push({ id: n.id, name: n.name, kind: n.kind, side, rect, tabs: tabGeoms,
+      hasChildren: n.children.length > 0,
+      innerBand: tabGeoms.length ? (m.tabLength - K.GAP) / 2 : 0,
+      outerBand: n.children.length ? (m.childTabLength - K.GAP) / 2 : 0,
+    });
 
     let a = alongStart + (m.span - m.childrenSpan) / 2;
     for (const c of n.children) {
@@ -260,9 +298,7 @@ function layoutOnce(vm: ViewModel, tabOrder: Map<string, string[]>): Layout {
 
 /** Part of a node's box not covered by tabs intruding from its inner (and, with children, outer) border. */
 export function labelArea(n: NodeGeom): Rect {
-  const band = (K.TAB_L - K.GAP) / 2;
-  const inner = n.tabs.length ? band : 0;
-  const outer = n.hasChildren ? band : 0;
+  const { innerBand: inner, outerBand: outer } = n;
   const { w, h } = n.rect;
   switch (n.side) {
     case 'W':
@@ -285,7 +321,7 @@ function r(v: number) {
  * mean position of the tabs they connect to (barycentre heuristic) to reduce crossings,
  * keeping topics of the same bundle contiguous.
  */
-export function layoutView(vm: ViewModel): Layout {
+export function layoutView(vm: ViewModel, mode: TopicTextMode = 'scroll'): Layout {
   const defaultOrder = new Map<string, string[]>();
   const name = (id: string) => vm.topics[id]?.name ?? id;
   for (const n of Object.values(vm.nodes)) {
@@ -293,7 +329,7 @@ export function layoutView(vm: ViewModel): Layout {
     ids.sort((a, b) => (vm.topics[a]?.bundleId ?? '').localeCompare(vm.topics[b]?.bundleId ?? '') || name(a).localeCompare(name(b), undefined, { numeric: true }));
     defaultOrder.set(n.id, ids);
   }
-  let layout = layoutOnce(vm, defaultOrder);
+  let layout = layoutOnce(vm, defaultOrder, mode);
   for (let pass = 0; pass < 2; pass++) {
     const nodeSide = new Map(layout.nodes.map((n) => [n.id, n.side]));
     const along = (nodeId: string, v: Vec) => (OUT[nodeSide.get(nodeId)!].axis === 'x' ? v.y : v.x);
@@ -331,7 +367,7 @@ export function layoutView(vm: ViewModel): Layout {
       ids.sort((a, b) => primary(a) - primary(b) || bundle(a).localeCompare(bundle(b)) || score.get(a)! - score.get(b)! || name(a).localeCompare(name(b)));
       order.set(n.id, ids);
     }
-    layout = layoutOnce(vm, order);
+    layout = layoutOnce(vm, order, mode);
   }
   return layout;
 }

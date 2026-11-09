@@ -72,11 +72,12 @@ The model is saved automatically in the browser (localStorage). Use **Save JSON*
 - **Click** a system, topic or the broker to edit it in the right pane. The system pane lists its produced and consumed topics, each with editable details.
 - **Double-click** a system or topic to focus the view on it. **Shift+double-click** adds more. You can also use the checkboxes in the left panel.
   - One system: its topics, its upstream leaves and the ETLs on the broker it exchanges with.
-  - Several systems: only the topics they exchange (turn off *Shared topics only* to see all of their topics).
+  - Several systems: only the topics they exchange (turn off *Shared only* to see all of their topics).
   - Topics: only the systems that produce or consume them.
   - The broker, or **Show all**: everything.
 - Dashed arrows (*Off-view flows*) show that a topic also flows to or from systems outside the current focus.
 - Both side panels have a handle next to the canvas: drag it to resize the panel, double-click it to reset the width, and use ‹ / › to collapse or show the panel.
+- **Drag a system on the diagram** to reorder it, move it to another border or attach it to another parent. It follows the same rules as dragging it in the left panel, which updates by itself. Escape cancels.
 - In the left panel:
   - Drag a system by its ⋮⋮ handle. Drop it above or below another row to reorder, on a border heading to move it to that border, or on the middle of a row to make it upstream of that system. The canvas follows the order in the left panel.
   - Topics: drag topics to reorder them. The sort button in the section header shows ↑ (A–Z), ↓ (Z–A) or ↕ (custom order). Click it to sort A–Z, or Z–A when the list is already A–Z.
@@ -91,6 +92,7 @@ The model is saved automatically in the browser (localStorage). Use **Save JSON*
   - While a chain is animating, **draw.io** export writes an overview page plus one page per step, with draw.io's flow animation on the current links. **SVG** export captures the current step.
 - Click **View** on a chain in the left panel to see it as a broker tube: topics are bars inside the tube, and the chain's systems sit around it. Click again, or use "Back to diagram", to return. SVG and draw.io export the tube view while it is shown.
 - **Group topics** collapses topics into one tab per bundle or per chain.
+- **Topic names** in the toolbar sets how a name longer than its box is shown: rolling text, a smaller font, or wider boxes.
 - The layout is recomputed on every change. It sizes boxes to their content, reorders tabs to reduce crossings and keeps bundle members together, and it never lets boxes overlap.
 
 ## Export

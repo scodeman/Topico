@@ -1,6 +1,6 @@
-import type { CSSProperties, MouseEvent, SVGProps } from 'react';
+import type { CSSProperties, MouseEvent, ReactNode, SVGProps } from 'react';
 import { stepState } from '../engine/animation';
-import { labelArea, type EdgeGeom, type Layout, type NodeGeom, type Rect, type TabGeom } from '../engine/layout';
+import { TOPIC_FONT, TOPIC_PAD, fitFontSize, labelArea, textWidth, type TopicTextMode, type EdgeGeom, type Layout, type NodeGeom, type Rect, type TabGeom } from '../engine/layout';
 import type { ViewModel } from '../engine/view';
 import type { Group } from '../model/types';
 
@@ -22,6 +22,8 @@ export interface DiagramHandlers {
   onTabClick(topicId: string, e: MouseEvent): void;
   onTabDoubleClick(topicId: string, e: MouseEvent): void;
   onHoverTopic(topicId: string | null): void;
+  /** Pressing a system may start dragging it. */
+  onNodeMouseDown?(id: string, e: MouseEvent): void;
 }
 
 export interface DiagramProps {
@@ -39,6 +41,10 @@ export interface DiagramProps {
   standalone?: boolean;
   /** Extra attributes for the root <svg> (viewBox, handlers…) when embedded on screen. */
   svgProps?: SVGProps<SVGSVGElement>;
+  /** Drawn on top of the diagram (drag and drop feedback). */
+  overlay?: ReactNode;
+  /** How topic names longer than their box are shown (default: rolling text). */
+  topicText?: TopicTextMode;
   /** Chain sequence being animated: arrows are styled by step, with step numbers. */
   anim?: { edgeSteps: Map<string, number[]>; current: number; color: string } | null;
 }
@@ -74,6 +80,7 @@ export function DiagramSvg(p: DiagramProps) {
         data-id={n.id}
         transform={at(n.rect)}
         style={{ ...move(n.rect), cursor: handlers ? 'pointer' : undefined }}
+        onMouseDown={handlers?.onNodeMouseDown ? (e) => handlers.onNodeMouseDown!(n.id, e) : undefined}
         onClick={handlers ? (e) => handlers.onNodeClick(n.id, e) : undefined}
         onDoubleClick={handlers ? (e) => handlers.onNodeDoubleClick(n.id, e) : undefined}
       >
@@ -99,7 +106,6 @@ export function DiagramSvg(p: DiagramProps) {
     const sel = p.selectedTopics?.has(tg.topicId);
     const fills = chainColors(tg.chainIds);
     const { w, h } = tg.rect;
-    const label = truncate(topic?.name ?? tg.topicId, 15);
     return (
       <g
         key={tg.key}
@@ -121,18 +127,7 @@ export function DiagramSvg(p: DiagramProps) {
           ),
         )}
         {topic?.isGroup && <rect x={2} y={2} width={w - 4} height={h - 4} fill="none" stroke={COLORS.ink} strokeDasharray="2 2" strokeWidth={0.8} />}
-        <text
-          x={w / 2}
-          y={h / 2}
-          textAnchor="middle"
-          dominantBaseline="central"
-          fontFamily={FONT}
-          fontSize={10}
-          fill={COLORS.ink}
-          transform={tg.vertical ? `rotate(-90 ${w / 2} ${h / 2})` : undefined}
-        >
-          {label}
-        </text>
+        <TopicLabel id={tg.key} text={topic?.name ?? tg.topicId} width={w} height={h} vertical={tg.vertical} mode={p.topicText ?? 'scroll'} />
       </g>
     );
   };
@@ -263,7 +258,51 @@ export function DiagramSvg(p: DiagramProps) {
           pointerEvents="none"
         />
       ))}
+      {p.overlay}
     </svg>
+  );
+}
+
+/**
+ * A topic name inside its box. A name that fits is simply centred. A longer one rolls back and forth
+ * inside the box in 'scroll' mode; otherwise it is reduced to fit ('fit' boxes are already wide enough,
+ * except a tube bar limited by its tube).
+ */
+export function TopicLabel(p: { id: string; text: string; width: number; height: number; vertical?: boolean; mode: TopicTextMode }) {
+  const length = p.vertical ? p.height : p.width;
+  const thickness = p.vertical ? p.width : p.height;
+  const room = length - TOPIC_PAD;
+  const full = textWidth(p.text);
+  const frame = `translate(${p.width / 2} ${p.height / 2})${p.vertical ? ' rotate(-90)' : ''}`;
+  if (p.mode === 'scroll' && full > room) {
+    const clipId = `topic-clip-${p.id.replace(/[^a-zA-Z0-9]/g, (c) => `_${c.charCodeAt(0)}`)}`;
+    const shift = Math.ceil(full - room);
+    const seconds = Math.max(4, (shift / 30) * 2 + 3);
+    return (
+      <g transform={frame}>
+        <clipPath id={clipId}>
+          <rect x={-length / 2 + 2} y={-thickness / 2} width={length - 4} height={thickness} />
+        </clipPath>
+        <g clipPath={`url(#${clipId})`}>
+          <text x={-room / 2} y={0} dominantBaseline="central" fontSize={TOPIC_FONT} fill={COLORS.ink}>
+            <animateTransform
+              attributeName="transform"
+              type="translate"
+              values={`0 0;0 0;${-shift} 0;${-shift} 0;0 0`}
+              keyTimes="0;0.15;0.5;0.65;1"
+              dur={`${seconds.toFixed(1)}s`}
+              repeatCount="indefinite"
+            />
+            {p.text}
+          </text>
+        </g>
+      </g>
+    );
+  }
+  return (
+    <text transform={frame} textAnchor="middle" dominantBaseline="central" fontSize={fitFontSize(p.text, length)} fill={COLORS.ink}>
+      {p.text}
+    </text>
   );
 }
 

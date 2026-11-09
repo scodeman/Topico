@@ -1,7 +1,8 @@
 import type { MouseEvent, SVGProps } from 'react';
 import type { ChainLayout, ChainNode } from '../engine/chainView';
 import { stepState } from '../engine/animation';
-import { COLORS, StepBadge } from './DiagramSvg';
+import type { TopicTextMode } from '../engine/layout';
+import { COLORS, StepBadge, TopicLabel } from './DiagramSvg';
 
 const FONT = 'Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, sans-serif';
 
@@ -19,6 +20,8 @@ export interface ChainSvgProps {
   handlers?: ChainHandlers;
   standalone?: boolean;
   svgProps?: SVGProps<SVGSVGElement>;
+  /** How topic names longer than their bar are shown (default: rolling text). */
+  topicText?: TopicTextMode;
   /** Chain sequence being animated: arrows are styled by step, with step numbers. */
   anim?: { arrowSteps: Map<string, number[]>; current: number } | null;
 }
@@ -151,9 +154,7 @@ export function ChainSvg(p: ChainSvgProps) {
           >
             <rect width={w} height={h} rx={3} fill="#fff" stroke={sel ? COLORS.accent : COLORS.ink} strokeWidth={sel ? 2.4 : 1} />
             <rect width={w} height={h} rx={3} fill={color} fillOpacity={0.15} />
-            <text x={w / 2} y={h / 2} textAnchor="middle" dominantBaseline="central" fontSize={10} fill={COLORS.ink}>
-              {truncate(bar.name, Math.floor(w / 6.2))}
-            </text>
+            <TopicLabel id={`bar-${bar.topicId}`} text={bar.name} width={w} height={h} mode={p.topicText ?? 'scroll'} />
           </g>
         );
       })}

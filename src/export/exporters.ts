@@ -6,12 +6,15 @@ import { NOTE, SosSvg } from '../components/SosSvg';
 import type { SosLayout } from '../engine/sosView';
 import type { ChainEnd, ChainLayout } from '../engine/chainView';
 import { stepState } from '../engine/animation';
-import { labelArea, type Layout, type TabGeom } from '../engine/layout';
+import { fitFontSize, labelArea, type Layout, type TabGeom, type TopicTextMode } from '../engine/layout';
+
+/** draw.io has no rolling text: a topic name always shows in full, at a font size that fits its box. */
+const topicFont = (name: string, length: number) => Math.max(4, Math.floor(fitFontSize(name, length)));
 import type { ViewModel } from '../engine/view';
 import type { Group, Model } from '../model/types';
 
-export function toSvg(layout: Layout, vm: ViewModel, groups: Group[], showStubs: boolean, anim?: DiagramProps['anim']): string {
-  const body = renderToStaticMarkup(createElement(DiagramSvg, { layout, vm, groups, showStubs, standalone: true, anim }));
+export function toSvg(layout: Layout, vm: ViewModel, groups: Group[], showStubs: boolean, anim?: DiagramProps['anim'], topicText?: TopicTextMode): string {
+  const body = renderToStaticMarkup(createElement(DiagramSvg, { layout, vm, groups, showStubs, standalone: true, anim, topicText }));
   return `<?xml version="1.0" encoding="UTF-8"?>\n${body}`;
 }
 
@@ -151,7 +154,8 @@ function diagramCells(
   for (const n of layout.nodes) {
     for (const t of n.tabs) {
       const fill = chainColor(t.chainIds[0]);
-      const style = `rounded=0;whiteSpace=wrap;html=1;fontSize=10;fillColor=${fill ? `${fill}38` : '#ffffff'};strokeColor=${COLORS.ink};${t.vertical ? 'horizontal=0;' : ''}${vm.topics[t.topicId]?.isGroup ? 'dashed=1;' : ''}${sk}`;
+      const tabName = vm.topics[t.topicId]?.name ?? t.topicId;
+      const style = `rounded=0;html=1;fontSize=${topicFont(tabName, t.vertical ? t.rect.h : t.rect.w)};fillColor=${fill ? `${fill}38` : '#ffffff'};strokeColor=${COLORS.ink};${t.vertical ? 'horizontal=0;' : ''}${vm.topics[t.topicId]?.isGroup ? 'dashed=1;' : ''}${sk}`;
       vertex(tabId(t), vm.topics[t.topicId]?.name ?? t.topicId, style, t.rect.x, t.rect.y, t.rect.w, t.rect.h);
     }
   }
@@ -169,8 +173,8 @@ function diagramCells(
   return cells;
 }
 
-export function toChainSvg(layout: ChainLayout, anim?: ChainSvgProps['anim']): string {
-  return `<?xml version="1.0" encoding="UTF-8"?>\n${renderToStaticMarkup(createElement(ChainSvg, { layout, standalone: true, anim }))}`;
+export function toChainSvg(layout: ChainLayout, anim?: ChainSvgProps['anim'], topicText?: TopicTextMode): string {
+  return `<?xml version="1.0" encoding="UTF-8"?>\n${renderToStaticMarkup(createElement(ChainSvg, { layout, standalone: true, anim, topicText }))}`;
 }
 
 /** draw.io XML for the broker-tube view of a chain. */
@@ -216,7 +220,7 @@ function chainCells(l: ChainLayout, opts: { sketch: boolean; anim?: DrawioAnim }
     );
   }
   for (const bar of l.bars) {
-    vertex(`b:${bar.topicId}`, bar.name, `rounded=1;whiteSpace=wrap;html=1;fontSize=10;fillColor=${l.color}26;strokeColor=${COLORS.ink};${sk}`, bar.rect.x, bar.rect.y, bar.rect.w, bar.rect.h);
+    vertex(`b:${bar.topicId}`, bar.name, `rounded=1;html=1;fontSize=${topicFont(bar.name, bar.rect.w)};fillColor=${l.color}26;strokeColor=${COLORS.ink};${sk}`, bar.rect.x, bar.rect.y, bar.rect.w, bar.rect.h);
   }
   if (anim) {
     const lines = step === 0 ? anim.count + 1 : anim.stepLabels[step! - 1].length + 1;

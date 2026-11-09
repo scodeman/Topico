@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Version | 0.18 |
+| Version | 0.20 |
 | Last updated | 2026-11-07 |
 | Reference material | [`images/`](images/) (hand-drawn target views), [`Topico.drawio`](Topico.drawio) (source sketch) |
 
@@ -83,13 +83,14 @@ The built-in sample model (toolbar button **Sample**) recreates ALL.png.
 | REN-04 | A system relays topics between its parent and its upstream nodes: what it consumes it passes on to its children, and what its children produce it receives. | Done (tested) | |
 | REN-05 | ETLs are visually distinct from systems. | Done | |
 | REN-06 | Hovering a topic highlights its arrows and dims all other arrows. | Done | |
+| REN-08 | The toolbar chooses how a topic name longer than its box is shown: rolling text, the full name in a smaller font, or wider boxes that fit the name. | Done (tested) | Default: rolling. Applies to the diagram tabs and the chain tube bars, and is remembered between sessions. Wider boxes give all the tabs of a system the length of its longest name, and systems and the broker grow to make room. In small font, names reduce down to 4 px at the smallest, and short names keep the normal size. SVG exports follow the choice. draw.io has no rolling text, so its exports show the full name at a size that fits. Checked in Chrome with real text widths. |
 
 ### 4.3 Selection and focused views
 
 | ID | Requirement | Status | Notes |
 |---|---|---|---|
 | SEL-01 | **Single system**: show only that system's topics, the broker, and its related upstream leaves and ETLs (SINGLE_SYS.png). | Done (tested) | The view includes ETLs attached to the broker that share a topic with the system. |
-| SEL-02 | **Several systems**: show only their topics and how they interact through the broker, plus their related upstream leaves and ETLs (MULTI_SYS.png). | Done (tested) | By default only topics shared by at least two of the selected systems are shown. A toolbar checkbox, *Shared topics only*, switches to all of their topics. If no topic is shared, all of their topics are shown. |
+| SEL-02 | **Several systems**: show only their topics and how they interact through the broker, plus their related upstream leaves and ETLs (MULTI_SYS.png). | Done (tested) | By default only topics shared by at least two of the selected systems are shown. A toolbar checkbox, *Shared only*, switches to all of their topics. If no topic is shared, all of their topics are shown. |
 | SEL-03 | **One or more topics**: show only the systems that relay them, the broker, and the related upstream leaves and ETLs (TOPICS.png). | Done (tested) | Parent systems are always kept so that upstream leaves stay connected. |
 | SEL-04 | **Clearing the filter or selecting the broker** shows everything (CENTRE.png). | Done (tested) | |
 | SEL-05 | A selection can be made on the canvas or in a selector panel. | Done | Canvas: double-click to focus, Shift/Cmd/Ctrl+double-click to add. Left panel: checkboxes. Filter bar: removable chips and a "Show all" link. |
@@ -137,6 +138,7 @@ The built-in sample model (toolbar button **Sample**) recreates ALL.png.
 | LAY-06 | Labels are never hidden under tabs. | Done | Labels are placed in the part of the box that tabs do not cover, and long names wrap. |
 | LAY-07 | The user can control the order of systems along a border. | Done (tested) | By drag and drop in the left panel (EXL-01). The order in the left panel is the order on the canvas. |
 | LAY-08 | Arrows avoid crossing boxes and labels. | **Open** | Arrows are curves between tab ends and can pass over the broker's label. |
+| LAY-09 | Systems can be dragged on the diagram to reorder them along a border, move them to another border or attach them to another parent. | Done (tested) | Same move and same rules as the left panel, which updates by itself. The two ends of a system mean before or after it, along its border, and the middle means upstream of it. So does the empty place beyond the outer edge of a system with no leaf yet, where its first leaf will appear. In a gap or over the broker, the system goes at that position on the nearest border. A ghost and a blue marker show where it will land. Escape cancels, and dropping it back on itself does nothing. Available on the main diagram. Checked in Chrome. |
 
 ### 4.7 Left panel (explorer)
 
@@ -260,6 +262,8 @@ The original request did not settle these points. They were decided during the i
 | Date | Version | Change |
 |---|---|---|
 | 2026-11-07 | 0.1 | Initial build covering §4.1–4.6, §4.8 and §4.10. Reference material moved to `docs/spec/`. |
+| 2026-11-09 | 0.20 | Systems can be dragged on the diagram (LAY-09). |
+| 2026-11-09 | 0.19 | Topic names longer than their box: rolling text, small font, or wider boxes (REN-08). |
 | 2026-11-09 | 0.18 | The right panel can be resized and collapsed (DET-06). |
 | 2026-11-09 | 0.17 | The left panel can be resized and collapsed (EXL-10, EXL-11). |
 | 2026-11-07 | 0.16 | Open source under the MIT licence. README badges, screenshots and live-app link. |
