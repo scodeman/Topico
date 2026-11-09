@@ -16,7 +16,7 @@ type DropHint = { side: Side } | { id: string; zone: 'before' | 'after' | 'insid
 type Dragged = { kind: 'system' | 'topic'; id: string } | null;
 
 /** Left panel: browse, filter (checkbox), hide (eye), add, rename, duplicate, delete and drag systems around. */
-export function Explorer() {
+export function Explorer({ hidden }: { hidden?: boolean }) {
   const model = useStore((s) => s.model);
   const ui = useStore((s) => s.ui);
   const st = useStore.getState;
@@ -150,7 +150,7 @@ export function Explorer() {
   const groupsOf = (type: 'bundle' | 'chain') => model.groups.filter((g) => g.type === type);
 
   return (
-    <aside className="explorer">
+    <aside className="explorer" hidden={hidden}>
       <input className="search" placeholder="Search…" value={query} onChange={(e) => setQuery(e.target.value)} />
 
       <Section

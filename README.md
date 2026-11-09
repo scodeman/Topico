@@ -76,6 +76,7 @@ The model is saved automatically in the browser (localStorage). Use **Save JSON*
   - Topics: only the systems that produce or consume them.
   - The broker, or **Show all**: everything.
 - Dashed arrows (*Off-view flows*) show that a topic also flows to or from systems outside the current focus.
+- Both side panels have a handle next to the canvas: drag it to resize the panel, double-click it to reset the width, and use ‹ / › to collapse or show the panel.
 - In the left panel:
   - Drag a system by its ⋮⋮ handle. Drop it above or below another row to reorder, on a border heading to move it to that border, or on the middle of a row to make it upstream of that system. The canvas follows the order in the left panel.
   - Topics: drag topics to reorder them. The sort button in the section header shows ↑ (A–Z), ↓ (Z–A) or ↕ (custom order). Click it to sort A–Z, or Z–A when the list is already A–Z.

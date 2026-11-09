@@ -47,6 +47,11 @@ export interface UiState {
   view: 'diagram' | 'sos';
   /** Chain sequence being animated (step is 1-based), or null. */
   animation: { chainId: string; step: number; playing: boolean } | null;
+  /** Side panels: width in pixels, and whether they are collapsed. */
+  explorerWidth: number;
+  explorerCollapsed: boolean;
+  detailsWidth: number;
+  detailsCollapsed: boolean;
 }
 
 const GROUP_COLORS = ['#0ea5e9', '#f97316', '#a855f7', '#22c55e', '#ef4444', '#eab308', '#14b8a6', '#ec4899'];
@@ -98,6 +103,10 @@ const initialUi: UiState = {
   chainView: null,
   view: 'diagram',
   animation: null,
+  explorerWidth: 260,
+  explorerCollapsed: false,
+  detailsWidth: 340,
+  detailsCollapsed: false,
 };
 
 const toggle = (list: string[], id: string) => (list.includes(id) ? list.filter((x) => x !== id) : [...list, id]);
@@ -111,7 +120,9 @@ export const useStore = create<Store>()(
       setModel: (m) =>
         set((s) => {
           s.model = normalizeModel(m);
-          s.ui = { ...initialUi, sketchExport: s.ui.sketchExport };
+          // A new model resets the view, not the user's panel layout or export preference.
+          const { sketchExport, explorerWidth, explorerCollapsed, detailsWidth, detailsCollapsed } = s.ui;
+          s.ui = { ...initialUi, sketchExport, explorerWidth, explorerCollapsed, detailsWidth, detailsCollapsed };
         }),
       updateCentre: (patch) => set((s) => void Object.assign(s.model.centre, patch)),
       updateSosSettings: ({ callouts, ...rest }) =>

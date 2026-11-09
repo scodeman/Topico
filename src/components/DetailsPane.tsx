@@ -13,19 +13,19 @@ import {
 } from '../model/types';
 
 /** Right panel: view and edit details of the focused element. */
-export function DetailsPane() {
+export function DetailsPane({ hidden }: { hidden?: boolean }) {
   const focus = useStore((s) => s.ui.focus);
   const setFocus = useStore((s) => s.setFocus);
   if (!focus) {
     return (
-      <aside className="details">
+      <aside className="details" hidden={hidden}>
         <p className="muted">Click a system, topic or the broker to see and edit its details.</p>
         <Help />
       </aside>
     );
   }
   return (
-    <aside className="details">
+    <aside className="details" hidden={hidden}>
       <button className="close" onClick={() => setFocus(null)} title="Close">×</button>
       {focus.kind === 'centre' && <CentrePane />}
       {focus.kind === 'system' && <SystemPane id={focus.id} />}

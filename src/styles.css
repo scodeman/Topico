@@ -28,9 +28,9 @@ textarea { resize: vertical; }
 .tb-group label { display: flex; align-items: center; gap: 4px; }
 .tb-right { margin-left: auto; }
 
-.workspace { flex: 1; display: grid; grid-template-columns: 260px 1fr 340px; min-height: 0; }
+.workspace { flex: 1; display: grid; min-height: 0; }
 
-.explorer { border-right: 1px solid var(--line); background: var(--panel); overflow: auto; padding: 8px; }
+.explorer { min-width: 0; background: var(--panel); overflow: auto; padding: 8px; }
 .search { width: 100%; margin-bottom: 8px; }
 .ex-section { margin-bottom: 10px; }
 .ex-section header { display: flex; align-items: center; justify-content: space-between; gap: 4px; }
@@ -63,7 +63,7 @@ textarea { resize: vertical; }
 .swatch-bundle { border: 2px solid; background: none; }
 .empty-hint { position: absolute; inset: 0; display: grid; place-items: center; color: var(--muted); pointer-events: none; }
 
-.details { border-left: 1px solid var(--line); background: var(--panel); overflow: auto; padding: 12px 14px 40px; position: relative; }
+.details { min-width: 0; background: var(--panel); overflow: auto; padding: 12px 14px 40px; position: relative; }
 .details .close { position: absolute; right: 8px; top: 8px; border: none; background: none; font-size: 18px; }
 .pane-kind { margin: 0 0 10px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.6px; color: var(--muted); }
 .field { display: flex; flex-direction: column; gap: 3px; margin-bottom: 8px; }
@@ -157,3 +157,10 @@ textarea { resize: vertical; }
 .seq-link { display: flex; justify-content: space-between; align-items: center; font-size: 12px; padding: 2px 0 2px 26px; }
 .seq-step select { width: 100%; font-size: 11px; margin-top: 2px; }
 .btn-row button.on { background: var(--ink); color: #fff; }
+
+/* side panels: resize handle and collapse button */
+.explorer[hidden], .details[hidden] { display: none; }
+.panel-splitter { position: relative; z-index: 5; cursor: col-resize; background: var(--panel); border-left: 1px solid var(--line); border-right: 1px solid var(--line); touch-action: none; }
+.panel-splitter:hover, .panel-splitter:focus-visible { background: #bfdbfe; outline: none; }
+.panel-toggle { position: absolute; top: 8px; left: 50%; transform: translateX(-50%); width: 16px; height: 32px; padding: 0 0 3px; font-size: 16px; font-weight: 700; line-height: 1; border-radius: 4px; color: var(--ink); }
+.panel-splitter.collapsed .panel-toggle { width: 14px; }

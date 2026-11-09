@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Version | 0.16 |
+| Version | 0.18 |
 | Last updated | 2026-11-07 |
 | Reference material | [`images/`](images/) (hand-drawn target views), [`Topico.drawio`](Topico.drawio) (source sketch) |
 
@@ -150,6 +150,8 @@ The built-in sample model (toolbar button **Sample**) recreates ALL.png.
 | EXL-06 | Duplicates are placed directly after the original. | Done (tested) | What is copied is described in §7, decision 10. |
 | EXL-07 | The user can rearrange topics in the Topics section by drag and drop. | Done (tested) | Drop on the top or bottom half of a row. There is no separate "manual" mode: the list always shows the user's order. Checked in Chrome. |
 | EXL-08 | One button in the Topics header sorts the list A–Z or Z–A and shows the current order. | Done (tested) | The button shows ↑ (A–Z), ↓ (Z–A) or ↕ (custom order, for example after a drag). Clicking sorts A–Z, or Z–A when the list is already A–Z. Sorting uses natural, case-insensitive order, so TOPIC 2 comes before TOPIC 10. The sorted result becomes the order the user can then drag. Checked in Chrome. |
+| EXL-10 | The left panel can be resized by dragging the handle between it and the canvas. | Done | Width between 180 and 640 px, and always leaving room for the canvas. Double-click the handle to reset to 260 px. Left and right arrow keys also resize it when the handle has focus. The width is remembered between sessions and is not reset by New, Sample or Open. Checked in Chrome. |
+| EXL-11 | The left panel can be collapsed and shown again. | Done | With the ‹ / › button on the handle, Enter on the focused handle, or by dragging the handle past the left edge. Dragging from the collapsed rail reopens it. The search text and open sections are kept while collapsed, and the collapsed state is remembered between sessions. Checked in Chrome. |
 
 ### 4.8 Details pane
 
@@ -160,6 +162,7 @@ The built-in sample model (toolbar button **Sample**) recreates ALL.png.
 | DET-03 | The system pane has subsections for its produced topics and its consumed topics. Each topic's details can be viewed and edited there. | Done | Each topic is a collapsible card with the full set of topic fields. |
 | DET-04 | Clicking the broker or a group opens its details. | Done | |
 | DET-05 | A single click opens details without changing the view. | Done | **Design decision**: click opens details, double-click focuses the view. |
+| DET-06 | The right panel can be resized and collapsed, like the left panel (EXL-10, EXL-11). | Done | Width between 240 and 720 px, default 340 px. Each panel's limit leaves at least 300 px for the canvas next to the other panel. While the panel is collapsed, clicking an element selects it without reopening the panel, so the layout the user chose stays as it is. Checked in Chrome. |
 
 ### 4.9 System of System view
 
@@ -257,6 +260,8 @@ The original request did not settle these points. They were decided during the i
 | Date | Version | Change |
 |---|---|---|
 | 2026-11-07 | 0.1 | Initial build covering §4.1–4.6, §4.8 and §4.10. Reference material moved to `docs/spec/`. |
+| 2026-11-09 | 0.18 | The right panel can be resized and collapsed (DET-06). |
+| 2026-11-09 | 0.17 | The left panel can be resized and collapsed (EXL-10, EXL-11). |
 | 2026-11-07 | 0.16 | Open source under the MIT licence. README badges, screenshots and live-app link. |
 | 2026-11-07 | 0.15 | Chain sequences, animate mode, and animated draw.io export (GRP-13 to GRP-15). |
 | 2026-11-07 | 0.14 | Automated dependency updates with GitHub Dependabot (NFR-07). |
