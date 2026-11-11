@@ -165,3 +165,20 @@ textarea { resize: vertical; }
 .panel-toggle { position: absolute; top: 8px; left: 50%; transform: translateX(-50%); width: 16px; height: 32px; padding: 0 0 3px; font-size: 16px; font-weight: 700; line-height: 1; border-radius: 4px; color: var(--ink); }
 .panel-splitter.collapsed .panel-toggle { width: 14px; }
 .canvas.sys-dragging, .canvas.sys-dragging * { cursor: grabbing !important; }
+
+/* left panel: folding, border headings */
+.side-label { display: flex; align-items: center; gap: 4px; padding-right: 4px; }
+.side-toggle { border: none; background: none; padding: 2px 0; font: inherit; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--muted); display: inline-flex; align-items: center; gap: 4px; }
+.side-toggle:hover { color: var(--ink); }
+.side-actions { margin-left: auto; display: flex; gap: 2px; }
+.side-actions button { font-size: 11px; line-height: 1; padding: 2px 5px; }
+.chevron { width: 12px; display: inline-block; font-size: 13px; line-height: 1; color: var(--ink); }
+.fold { border: none; background: none; padding: 0; width: 14px; flex: none; font-size: 13px; line-height: 1; color: var(--ink); }
+.fold:hover { color: var(--ink); }
+.fold-spacer { width: 14px; flex: none; }
+.fold-count { font-size: 10px; color: var(--muted); background: #e2e8f0; border-radius: 8px; padding: 0 5px; text-transform: none; letter-spacing: 0; }
+
+/* legend hide / show */
+.legend-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--muted); margin-bottom: 2px; }
+.legend-head button { border: none; background: none; padding: 0 2px; font-size: 13px; line-height: 1; color: var(--muted); }
+.legend-show { position: absolute; left: 10px; bottom: 10px; font-size: 11px; padding: 3px 10px; background: rgba(255, 255, 255, 0.9); }

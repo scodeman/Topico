@@ -446,7 +446,7 @@ function SequenceEditor({ chainId }: { chainId: string }) {
           className={animating ? 'on' : ''}
           disabled={!seq.length}
           onClick={() => st().setUi(animating ? { animation: null } : { animation: { chainId, step: 1, playing: true }, view: 'diagram' })}
-          title="Play the sequence on the diagram (and in the chain view)"
+          title="Play the sequence on the Topics view (and in the chain view)"
         >
           {animating ? 'Stop animation' : '▶ Animate'}
         </button>

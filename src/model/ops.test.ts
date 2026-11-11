@@ -123,3 +123,42 @@ describe('topic order', () => {
     expect(moveTopic(m, 't2', { kind: 'before', refId: 't2' })).toBe(false);
   });
 });
+
+describe('group order', () => {
+  it('sorts the chains A–Z and Z–A without moving the bundles', async () => {
+    const { sortGroups, nameOrderState } = await import('./ops');
+    const m = sampleModel();
+    const chains = () => m.groups.filter((g) => g.type === 'chain').map((g) => g.name);
+    expect(chains()).toEqual(['Order flow', 'Billing', 'Settlement']);
+    expect(nameOrderState(m.groups.filter((g) => g.type === 'chain'))).toBeNull();
+    sortGroups(m, 'chain', 'asc');
+    expect(chains()).toEqual(['Billing', 'Order flow', 'Settlement']);
+    expect(nameOrderState(m.groups.filter((g) => g.type === 'chain'))).toBe('asc');
+    sortGroups(m, 'chain', 'desc');
+    expect(chains()).toEqual(['Settlement', 'Order flow', 'Billing']);
+    expect(m.groups[0]).toMatchObject({ type: 'bundle', name: 'Reference data' });
+  });
+});
+
+describe('manual group order', () => {
+  it('moves a chain before or after another chain, and the sort button then shows a custom order', async () => {
+    const { moveGroup, nameOrderState } = await import('./ops');
+    const m = sampleModel();
+    const chains = () => m.groups.filter((g) => g.type === 'chain').map((g) => g.id);
+    expect(moveGroup(m, 'c-settle', { kind: 'before', refId: 'c-order' })).toBe(true);
+    expect(chains()).toEqual(['c-settle', 'c-order', 'c-billing']);
+    expect(moveGroup(m, 'c-settle', { kind: 'after', refId: 'c-billing' })).toBe(true);
+    expect(chains()).toEqual(['c-order', 'c-billing', 'c-settle']);
+    m.groups.push({ id: 'b-x', name: 'A bundle', type: 'bundle', color: '#000', description: '', hidden: false, sequence: [] });
+    moveGroup(m, 'b-x', { kind: 'before', refId: 'b-ref' });
+    expect(m.groups.filter((g) => g.type === 'bundle').map((g) => g.id)).toEqual(['b-x', 'b-ref']);
+    expect(nameOrderState(m.groups.filter((g) => g.type === 'bundle'))).toBe('asc');
+  });
+
+  it('never mixes bundles and chains', async () => {
+    const { moveGroup } = await import('./ops');
+    const m = sampleModel();
+    expect(moveGroup(m, 'b-ref', { kind: 'after', refId: 'c-order' })).toBe(false);
+    expect(moveGroup(m, 'c-order', { kind: 'before', refId: 'c-order' })).toBe(false);
+  });
+});

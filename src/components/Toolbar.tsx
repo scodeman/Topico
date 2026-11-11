@@ -85,14 +85,14 @@ export function Toolbar() {
       <div className="tb-group">
         <span className="seg" role="group" aria-label="View">
           <button className={ui.view === 'diagram' && !ui.chainView ? 'on' : ''} onClick={() => setUi({ view: 'diagram', chainView: null })}>
-            Diagram
+            Topics
           </button>
           <button className={ui.view === 'sos' && !ui.chainView ? 'on' : ''} onClick={() => setUi({ view: 'sos', chainView: null })}>
             System of System
           </button>
         </span>
       </div>
-      <div className={`tb-group${sosLayout ? ' tb-disabled' : ''}`} title={sosLayout ? 'This option applies to the diagram and chain views' : undefined}>
+      <div className={`tb-group${sosLayout ? ' tb-disabled' : ''}`} title={sosLayout ? 'This option applies to the Topics and chain views' : undefined}>
         <label title="How topic names longer than their box are shown">
           Topic names
           <select value={ui.topicText} onChange={(e) => setUi({ topicText: e.target.value as TopicTextMode })}>
@@ -102,7 +102,7 @@ export function Toolbar() {
           </select>
         </label>
       </div>
-      <div className={`tb-group${sosLayout || chainLayout ? ' tb-disabled' : ''}`} title={sosLayout || chainLayout ? 'These options apply to the diagram view' : undefined}>
+      <div className={`tb-group${sosLayout || chainLayout ? ' tb-disabled' : ''}`} title={sosLayout || chainLayout ? 'These options apply to the Topics view' : undefined}>
         <label>
           Group topics
           <select value={ui.collapseBy} onChange={(e) => setUi({ collapseBy: e.target.value as CollapseBy })}>

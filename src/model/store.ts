@@ -3,7 +3,7 @@ import { persist } from 'zustand/middleware';
 import { immer } from 'zustand/middleware/immer';
 import type { TopicTextMode } from '../engine/layout';
 import type { CollapseBy } from '../engine/view';
-import { duplicateGroup, duplicateSystem, duplicateTopic, moveSystem, moveTopic, sortTopics, type MoveTarget, type SortDir } from './ops';
+import { duplicateGroup, duplicateSystem, duplicateTopic, moveGroup, moveSystem, moveTopic, sortGroups, sortTopics, type MoveTarget, type SortDir } from './ops';
 import { sampleModel } from './sample';
 import {
   CENTRE_ID,
@@ -50,6 +50,10 @@ export interface UiState {
   animation: { chainId: string; step: number; playing: boolean } | null;
   /** How topic names longer than their box are shown. */
   topicText: TopicTextMode;
+  /** Left panel: folded system rows (system ids) and folded borders (`side:W`…). */
+  folded: string[];
+  /** The canvas legend is hidden. */
+  legendHidden: boolean;
   /** Side panels: width in pixels, and whether they are collapsed. */
   explorerWidth: number;
   explorerCollapsed: boolean;
@@ -76,6 +80,9 @@ interface Store {
   /** Drag & drop of topics in the explorer. */
   moveTopic(id: string, target: { kind: 'before' | 'after'; refId: string }): void;
   sortTopics(dir: SortDir): void;
+  sortGroups(type: GroupType, dir: SortDir): void;
+  /** Drag & drop of bundles or chains in the explorer, within their own section. */
+  moveGroup(id: string, target: { kind: 'before' | 'after'; refId: string }): void;
   addTopic(name?: string): string;
   updateTopic(id: string, patch: Partial<Topic>): void;
   deleteTopic(id: string): void;
@@ -107,6 +114,8 @@ const initialUi: UiState = {
   view: 'diagram',
   animation: null,
   topicText: 'scroll',
+  folded: [],
+  legendHidden: false,
   explorerWidth: 260,
   explorerCollapsed: false,
   detailsWidth: 340,
@@ -125,8 +134,8 @@ export const useStore = create<Store>()(
         set((s) => {
           s.model = normalizeModel(m);
           // A new model resets the view, not the user's panel layout or export preference.
-          const { sketchExport, topicText, explorerWidth, explorerCollapsed, detailsWidth, detailsCollapsed } = s.ui;
-          s.ui = { ...initialUi, sketchExport, topicText, explorerWidth, explorerCollapsed, detailsWidth, detailsCollapsed };
+          const { sketchExport, topicText, legendHidden, explorerWidth, explorerCollapsed, detailsWidth, detailsCollapsed } = s.ui;
+          s.ui = { ...initialUi, sketchExport, topicText, legendHidden, explorerWidth, explorerCollapsed, detailsWidth, detailsCollapsed };
         }),
       updateCentre: (patch) => set((s) => void Object.assign(s.model.centre, patch)),
       updateSosSettings: ({ callouts, ...rest }) =>
@@ -193,6 +202,8 @@ export const useStore = create<Store>()(
         }),
       moveTopic: (id, target) => set((s) => void moveTopic(s.model, id, target)),
       sortTopics: (dir) => set((s) => void sortTopics(s.model, dir)),
+      sortGroups: (type, dir) => set((s) => void sortGroups(s.model, type, dir)),
+      moveGroup: (id, target) => set((s) => void moveGroup(s.model, id, target)),
       duplicateGroup: (id) =>
         set((s) => {
           const copy = duplicateGroup(s.model, id);

@@ -1,4 +1,4 @@
-import { descendants, newId, type Model, type Side } from './types';
+import { descendants, newId, type Model, type Side, type GroupType } from './types';
 
 /**
  * Where a system is dropped in the explorer:
@@ -109,10 +109,29 @@ export function sortTopics(m: Model, dir: SortDir): void {
   m.topics.sort((a, b) => (dir === 'asc' ? 1 : -1) * compareNames(a.name, b.name));
 }
 
-/** Is the list currently in A–Z or Z–A order? null when it is in a custom (dragged) order. */
-export function topicOrderState(topics: { name: string }[]): SortDir | null {
-  const inOrder = (sign: number) => topics.every((t, i) => i === 0 || sign * compareNames(topics[i - 1].name, t.name) <= 0);
+/** Is a list currently in A–Z or Z–A order? null when it is in a custom (dragged) order. */
+export function nameOrderState(items: { name: string }[]): SortDir | null {
+  const inOrder = (sign: number) => items.every((t, i) => i === 0 || sign * compareNames(items[i - 1].name, t.name) <= 0);
   return inOrder(1) ? 'asc' : inOrder(-1) ? 'desc' : null;
+}
+export const topicOrderState = nameOrderState;
+
+/** Sort the bundles (or the chains) A–Z or Z–A, leaving the other kind of group where it is. Mutates `m`. */
+export function sortGroups(m: Model, type: GroupType, dir: SortDir): void {
+  const slots = m.groups.map((g, i) => (g.type === type ? i : -1)).filter((i) => i >= 0);
+  const sorted = slots.map((i) => m.groups[i]).sort((a, b) => (dir === 'asc' ? 1 : -1) * compareNames(a.name, b.name));
+  slots.forEach((slot, k) => (m.groups[slot] = sorted[k]));
+}
+
+/** Manual reordering of a bundle or chain, before or after another group of the same kind. Mutates `m`. */
+export function moveGroup(m: Model, id: string, target: { kind: 'before' | 'after'; refId: string }): boolean {
+  if (id === target.refId) return false;
+  const g = m.groups.find((x) => x.id === id);
+  const ref = m.groups.find((x) => x.id === target.refId);
+  if (!g || !ref || g.type !== ref.type) return false;
+  m.groups.splice(m.groups.indexOf(g), 1);
+  m.groups.splice(m.groups.indexOf(ref) + (target.kind === 'after' ? 1 : 0), 0, g);
+  return true;
 }
 
 /** Manual reordering: put topic `id` before or after `refId`. Mutates `m`. */

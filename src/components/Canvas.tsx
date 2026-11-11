@@ -295,9 +295,9 @@ function FilterBar() {
       <div className="filter-bar">
         <span className="chip chip-chain" style={{ borderColor: chain.color }}>
           Chain view: {chain.name}
-          <button onClick={() => setUi({ chainView: null })} title="Back to the diagram">×</button>
+          <button onClick={() => setUi({ chainView: null })} title="Back to the Topics view">×</button>
         </span>
-        <button className="link" onClick={() => setUi({ chainView: null })}>Back to diagram</button>
+        <button className="link" onClick={() => setUi({ chainView: null })}>Back to Topics</button>
       </div>
     );
   }
@@ -325,9 +325,24 @@ function FilterBar() {
 function Legend() {
   const groups = useStore((s) => s.model.groups);
   const updateGroup = useStore((s) => s.updateGroup);
+  const hidden = useStore((s) => s.ui.legendHidden);
+  const setUi = useStore((s) => s.setUi);
   if (!groups.length) return null;
+  if (hidden) {
+    return (
+      <button className="legend-show" onClick={() => setUi({ legendHidden: false })} title="Show the legend">
+        Legend
+      </button>
+    );
+  }
   return (
     <div className="legend">
+      <div className="legend-head">
+        <span>Legend</span>
+        <button onClick={() => setUi({ legendHidden: true })} title="Hide the legend" aria-label="Hide the legend">
+          ×
+        </button>
+      </div>
       {groups.map((g) => (
         <button
           key={g.id}

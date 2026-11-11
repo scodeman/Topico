@@ -34,7 +34,7 @@ Group the endpoints of a business flow into a **chain**, number its links in a *
 <img src="docs/images/chain-animation.gif" alt="Animation of the Billing chain in the tube view, step 1 to 3" width="560">
 
 ### See the System of System
-Switch the toolbar to **System of System**. Inner systems sit in a central box and outer systems surround it like petals, each with its notes. Arrows list the topics that go in and out.
+Switch the toolbar from **Topics** to **System of System**. Inner systems sit in a central box and outer systems surround it like petals, each with its notes. Arrows list the topics that go in and out.
 
 [![System of System view](docs/images/sos.png)](https://scodeman.github.io/Topico/)
 
@@ -81,17 +81,20 @@ The model is saved automatically in the browser (localStorage). Use **Save JSON*
 - In the left panel:
   - Drag a system by its ⋮⋮ handle. Drop it above or below another row to reorder, on a border heading to move it to that border, or on the middle of a row to make it upstream of that system. The canvas follows the order in the left panel.
   - Topics: drag topics to reorder them. The sort button in the section header shows ↑ (A–Z), ↓ (Z–A) or ↕ (custom order). Click it to sort A–Z, or Z–A when the list is already A–Z.
+  - Fold a parent's upstream systems with its ▾ chevron, or a whole border with the chevron on its heading. ⊟ and ⊞ on a border fold or unfold all of its rows, and **+** adds a system on that border.
+  - Bundles and Chains have the same ↑ / ↓ sort button as Topics, and can also be dragged into your own order.
   - Double-click any item to rename it.
-  - Right-click any item for Rename, Duplicate and Delete.
+  - Right-click any item for Rename, Duplicate and Delete. On a system, **+ System** and **+ ETL** add one upstream of it.
 - On a bundle or chain, ● / ◌ (or a click on it in the canvas legend) hides or shows its colouring only. Its topics and flows stay, drawn in the default style.
 - ● / ◌ hides or shows a system (with its upstream systems) or a topic. Single interactions can be hidden from the system or topic pane.
-- **System of System view**: switch the toolbar to **System of System** to see the inner systems in a central box and the outer systems around it like petals, each with a note callout and arrows listing the topics exchanged. Set each system **Inner**, **Outer** or **Not shown** with the role button on its row in the left panel (shown while the SoS view is on), from its right-click menu, or in its details pane. The bar above the canvas sets the box title, switches the **inside lines** on or off, and chooses what the callouts show (notes, description, properties, topics). When the broker is shown, it sits in the middle of the box and every inside line goes through it. A parent and its leaf can be shown or hidden independently. By default only the broker is inside, every system is outside with its notes, and ETLs are not shown.
+- **System of System view**: switch the toolbar from **Topics** to **System of System** to see the inner systems in a central box and the outer systems around it like petals, each with a note callout and arrows listing the topics exchanged. Set each system **Inner**, **Outer** or **Not shown** with the role button on its row in the left panel (shown while the SoS view is on), from its right-click menu, or in its details pane. The bar above the canvas sets the box title, switches the **inside lines** on or off, and chooses what the callouts show (notes, description, properties, topics). When the broker is shown, it sits in the middle of the box and every inside line goes through it. A parent and its leaf can be shown or hidden independently. By default only the broker is inside, every system is outside with its notes, and ETLs are not shown.
 - **Chain sequences and animation**:
   - In a chain's pane, build a numbered **Sequence**. Each step holds one or more of the chain's links, such as "NORTH SYS 1 → ETL W1 · TOPIC 5". **Auto-fill** proposes an order that follows the flow.
   - Click ▶ on the chain row, or **▶ Animate** in the pane, to play the sequence on the diagram and in the chain view. Use the player bar to pause or step through.
   - While a chain is animating, **draw.io** export writes an overview page plus one page per step, with draw.io's flow animation on the current links. **SVG** export captures the current step.
-- Click **View** on a chain in the left panel to see it as a broker tube: topics are bars inside the tube, and the chain's systems sit around it. Click again, or use "Back to diagram", to return. SVG and draw.io export the tube view while it is shown.
+- Click **View** on a chain in the left panel to see it as a broker tube: topics are bars inside the tube, and the chain's systems sit around it. Click again, or use "Back to Topics", to return. SVG and draw.io export the tube view while it is shown.
 - **Group topics** collapses topics into one tab per bundle or per chain.
+- Hide the canvas legend with its ×, and bring it back with the **Legend** button.
 - **Topic names** in the toolbar sets how a name longer than its box is shown: rolling text, a smaller font, or wider boxes.
 - The layout is recomputed on every change. It sizes boxes to their content, reorders tabs to reduce crossings and keeps bundle members together, and it never lets boxes overlap.
 

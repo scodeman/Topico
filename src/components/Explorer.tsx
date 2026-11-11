@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type DragEvent, type MouseEvent, type ReactNode } from 'react';
 import { groupTopicId } from '../engine/view';
-import { canMoveSystem, topicOrderState, type MoveTarget } from '../model/ops';
+import { canMoveSystem, nameOrderState, type MoveTarget, type SortDir } from '../model/ops';
 import { useStore } from '../model/store';
 import { SIDES, SIDE_LABEL, SOS_ROLE_LABEL, effectiveSide, type Side, type SosRole, type SystemNode } from '../model/types';
 
@@ -13,7 +13,7 @@ interface MenuState {
 }
 
 type DropHint = { side: Side } | { id: string; zone: 'before' | 'after' | 'inside' } | null;
-type Dragged = { kind: 'system' | 'topic'; id: string } | null;
+type Dragged = { kind: 'system' | 'topic' | 'group'; id: string } | null;
 
 /** Left panel: browse, filter (checkbox), hide (eye), add, rename, duplicate, delete and drag systems around. */
 export function Explorer({ hidden }: { hidden?: boolean }) {
@@ -31,6 +31,25 @@ export function Explorer({ hidden }: { hidden?: boolean }) {
   const focusId = ui.focus && 'id' in ui.focus ? ui.focus.id : ui.focus?.kind;
   // In the System of System view, each system row shows its SoS role and lets the user change it.
   const sosMode = ui.view === 'sos' && !ui.chainView;
+
+  /* ---------- folding of system rows ---------- */
+  // Keys: a system id (its upstream rows are folded) or `side:<W|N|E|S>` (the whole border is folded).
+  // While searching, folds are ignored so every match shows.
+  const folded = new Set(ui.folded);
+  const isFolded = (key: string) => !q && folded.has(key);
+  const setFolded = (next: Set<string>) => st().setUi({ folded: [...next] });
+  const toggleFold = (key: string) => {
+    const next = new Set(folded);
+    if (next.has(key)) next.delete(key);
+    else next.add(key);
+    setFolded(next);
+  };
+  const childrenOf = (id: string) => model.systems.filter((c) => c.parentId === id);
+  const parentsOnSide = (side: Side) => model.systems.filter((s) => effectiveSide(model, s.id) === side && childrenOf(s.id).length).map((s) => s.id);
+  const foldAll = (side: Side) => setFolded(new Set([...folded, ...parentsOnSide(side)]));
+  const unfoldAll = (side: Side) => setFolded(new Set([...folded].filter((k) => k !== `side:${side}` && !parentsOnSide(side).includes(k))));
+  const unfold = (...keys: string[]) => setFolded(new Set([...folded].filter((k) => !keys.includes(k))));
+  const countUnder = (id: string): number => childrenOf(id).reduce((n, c) => n + 1 + countUnder(c.id), 0);
 
   const openMenu = (item: ItemRef) => (e: MouseEvent) => {
     e.preventDefault();
@@ -93,9 +112,10 @@ export function Explorer({ hidden }: { hidden?: boolean }) {
   });
 
   const systemRow = (s: SystemNode, depth: number): ReactNode => {
-    const children = model.systems.filter((c) => c.parentId === s.id);
+    const children = childrenOf(s.id);
     const childRows = children.map((c) => systemRow(c, depth + 1)).filter(Boolean);
     if (!match(s.name) && childRows.length === 0) return null;
+    const closed = isFolded(s.id);
     return (
       <div key={s.id}>
         <Row
@@ -111,8 +131,9 @@ export function Explorer({ hidden }: { hidden?: boolean }) {
           {...renameProps({ kind: 'system', id: s.id })}
           {...systemDnd(s)}
           extra={sosMode && <SosRoleButton role={s.sos} onChange={(sos) => st().updateSystem(s.id, { sos })} />}
+          fold={children.length ? { open: !closed, onToggle: () => toggleFold(s.id), hiddenCount: countUnder(s.id) } : null}
         />
-        {childRows}
+        {!closed && childRows}
       </div>
     );
   };
@@ -149,6 +170,37 @@ export function Explorer({ hidden }: { hidden?: boolean }) {
 
   const groupsOf = (type: 'bundle' | 'chain') => model.groups.filter((g) => g.type === type);
 
+  // Bundles and chains: before/after another group of the same kind.
+  const groupDnd = (id: string, type: 'bundle' | 'chain') => {
+    const half = (e: DragEvent): 'before' | 'after' => {
+      const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
+      return e.clientY - r.top < r.height / 2 ? 'before' : 'after';
+    };
+    const sameKind = () => drag?.kind === 'group' && drag.id !== id && model.groups.find((g) => g.id === drag.id)?.type === type;
+    return {
+      draggable: true,
+      onDragStart: (e: DragEvent) => {
+        e.dataTransfer.setData('text/plain', id);
+        e.dataTransfer.effectAllowed = 'move';
+        setDrag({ kind: 'group', id });
+      },
+      onDragEnd: endDrag,
+      onDragOver: (e: DragEvent) => {
+        if (!sameKind()) return;
+        e.preventDefault();
+        const h = { id, zone: half(e) };
+        if (JSON.stringify(h) !== JSON.stringify(hint)) setHint(h);
+      },
+      onDrop: (e: DragEvent) => {
+        e.preventDefault();
+        if (sameKind()) st().moveGroup(drag!.id, { kind: half(e), refId: id });
+        endDrag();
+      },
+      dropZone: hint && 'id' in hint && hint.id === id && drag?.kind === 'group' ? hint.zone : undefined,
+      dragging: drag?.kind === 'group' && drag.id === id,
+    };
+  };
+
   return (
     <aside className="explorer" hidden={hidden}>
       <input className="search" placeholder="Search…" value={query} onChange={(e) => setQuery(e.target.value)} />
@@ -184,6 +236,10 @@ export function Explorer({ hidden }: { hidden?: boolean }) {
           );
           const rows = roots.map((s) => systemRow(s, 1)).filter(Boolean);
           const isHint = !!hint && 'side' in hint && hint.side === side;
+          const sideKey = `side:${side}`;
+          const closed = isFolded(sideKey);
+          const parents = parentsOnSide(side);
+          const count = model.systems.filter((s) => effectiveSide(model, s.id) === side).length;
           return (
             <div key={side}>
               <div
@@ -192,9 +248,30 @@ export function Explorer({ hidden }: { hidden?: boolean }) {
                 onDrop={(e) => drop(e, { kind: 'side', side })}
                 title="Drop a system here to move it to this border"
               >
-                {SIDE_LABEL[side]}
+                <button className="side-toggle" onClick={() => toggleFold(sideKey)} aria-expanded={!closed} title={closed ? `Show the ${SIDE_LABEL[side]} systems` : `Fold the ${SIDE_LABEL[side]} border`}>
+                  <span className="chevron">{closed ? '▸' : '▾'}</span>
+                  {SIDE_LABEL[side]}
+                  {closed && count > 0 && <span className="fold-count">{count}</span>}
+                </button>
+                <span className="side-actions">
+                  <button
+                    onClick={() => {
+                      unfold(sideKey);
+                      st().addSystem({ kind: 'system', side });
+                    }}
+                    title={`Add a system on the ${SIDE_LABEL[side]} border`}
+                  >
+                    +
+                  </button>
+                  <button onClick={() => foldAll(side)} disabled={!parents.length || parents.every((id) => folded.has(id))} title="Fold all: show only the systems on the broker">
+                    ⊟
+                  </button>
+                  <button onClick={() => unfoldAll(side)} disabled={!closed && parents.every((id) => !folded.has(id))} title="Unfold all: show every upstream system">
+                    ⊞
+                  </button>
+                </span>
               </div>
-              {rows.length ? rows : <div className="side-empty">{dragId ? 'Drop here' : 'No systems'}</div>}
+              {!closed && (rows.length ? rows : <div className="side-empty">{dragId ? 'Drop here' : 'No systems'}</div>)}
             </div>
           );
         })}
@@ -204,7 +281,7 @@ export function Explorer({ hidden }: { hidden?: boolean }) {
         title="Topics"
         actions={
           <>
-            <SortButton />
+            <SortButton items={model.topics} what="topics" onSort={(dir) => st().sortTopics(dir)} />
             <button onClick={() => st().setFocus({ kind: 'topic', id: st().addTopic() })}>+ Topic</button>
           </>
         }
@@ -233,7 +310,12 @@ export function Explorer({ hidden }: { hidden?: boolean }) {
         <Section
           key={type}
           title={type === 'bundle' ? 'Bundles' : 'Chains'}
-          actions={<button onClick={() => st().addGroup(type)}>+ {type === 'bundle' ? 'Bundle' : 'Chain'}</button>}
+          actions={
+            <>
+              <SortButton items={groupsOf(type)} what={type === 'bundle' ? 'bundles' : 'chains'} onSort={(dir) => st().sortGroups(type, dir)} />
+              <button onClick={() => st().addGroup(type)}>+ {type === 'bundle' ? 'Bundle' : 'Chain'}</button>
+            </>
+          }
         >
           {groupsOf(type)
             .filter((g) => match(g.name))
@@ -268,7 +350,7 @@ export function Explorer({ hidden }: { hidden?: boolean }) {
                       <button
                         className={`view-btn${viewing ? ' on' : ''}`}
                         onClick={() => st().setUi({ chainView: viewing ? null : g.id, view: 'diagram' })}
-                        title={viewing ? 'Back to the diagram' : 'Show this chain as a broker tube'}
+                        title={viewing ? 'Back to the Topics view' : 'Show this chain as a broker tube'}
                         aria-pressed={viewing}
                       >
                         {viewing ? 'Viewing' : 'View'}
@@ -287,18 +369,19 @@ export function Explorer({ hidden }: { hidden?: boolean }) {
                   hidden={g.hidden}
                   onToggleHidden={() => st().updateGroup(g.id, { hidden: !g.hidden })}
                   {...renameProps({ kind: 'group', id: g.id })}
+                  {...groupDnd(g.id, type)}
                 />
               );
             })}
         </Section>
       ))}
 
-      {menu && <ContextMenu menu={menu} onClose={() => setMenu(null)} onRename={() => setRenaming(itemKey(menu.item))} />}
+      {menu && <ContextMenu menu={menu} onClose={() => setMenu(null)} onRename={() => setRenaming(itemKey(menu.item))} onAddUnder={(id) => unfold(id)} />}
     </aside>
   );
 }
 
-function ContextMenu({ menu, onClose, onRename }: { menu: MenuState; onClose(): void; onRename(): void }) {
+function ContextMenu({ menu, onClose, onRename, onAddUnder }: { menu: MenuState; onClose(): void; onRename(): void; onAddUnder(id: string): void }) {
   const ref = useRef<HTMLDivElement>(null);
   const st = useStore.getState;
   const model = useStore((s) => s.model);
@@ -353,6 +436,14 @@ function ContextMenu({ menu, onClose, onRename }: { menu: MenuState; onClose(): 
     else st().deleteGroup(item.id);
   };
   const isCentre = item.kind === 'centre';
+  // New systems and ETLs go upstream of the clicked system, or on the broker for the broker row.
+  const addUnder = (kind: 'system' | 'etl') => {
+    if (item.kind === 'system') {
+      onAddUnder(item.id);
+      st().addSystem({ kind, parentId: item.id });
+    } else st().addSystem({ kind });
+  };
+  const canAdd = item.kind === 'system' || isCentre;
   const sosRole: SosRole | null =
     item.kind === 'centre' ? model.centre.sos : item.kind === 'system' ? (model.systems.find((s) => s.id === item.id)?.sos ?? null) : null;
   const setRole = (sos: SosRole) => {
@@ -362,13 +453,20 @@ function ContextMenu({ menu, onClose, onRename }: { menu: MenuState; onClose(): 
 
   // Keep the menu inside the window.
   const x = Math.min(menu.x, window.innerWidth - 190);
-  const y = Math.min(menu.y, window.innerHeight - 150);
+  const y = Math.max(8, Math.min(menu.y, window.innerHeight - (canAdd ? 330 : 150)));
   return (
     <div className="context-menu" ref={ref} style={{ left: x, top: y }} onContextMenu={(e) => e.preventDefault()}>
       <div className="cm-title">{name}</div>
       <button onClick={run(onRename)}>Rename<span className="cm-hint">double-click</span></button>
       <button onClick={run(duplicate)} disabled={isCentre} title={isCentre ? 'There is only one broker' : undefined}>Duplicate</button>
       <button className="danger" onClick={run(remove)} disabled={isCentre} title={isCentre ? 'The broker cannot be deleted' : undefined}>Delete</button>
+      {canAdd && (
+        <>
+          <div className="cm-title">{isCentre ? 'Add on the broker' : 'Add upstream'}</div>
+          <button onClick={run(() => addUnder('system'))}>+ System</button>
+          <button onClick={run(() => addUnder('etl'))}>+ ETL</button>
+        </>
+      )}
       {sosRole && (
         <>
           <div className="cm-title">System of System</div>
@@ -386,16 +484,19 @@ function ContextMenu({ menu, onClose, onRename }: { menu: MenuState; onClose(): 
   );
 }
 
-/** Shows whether topics are A–Z (↑), Z–A (↓) or in a custom order (↕); click to sort. */
-function SortButton() {
-  const topics = useStore((s) => s.model.topics);
-  const sortTopics = useStore((s) => s.sortTopics);
-  const state = topicOrderState(topics);
+/** Shows whether a list is A–Z (↑), Z–A (↓) or in a custom order (↕); click to sort. */
+function SortButton({ items, what, onSort }: { items: { name: string }[]; what: string; onSort(dir: SortDir): void }) {
+  const state = nameOrderState(items);
   const next = state === 'asc' ? 'desc' : 'asc';
-  const label = state === 'asc' ? 'A–Z ↑' : state === 'desc' ? 'Z–A ↓' : 'A–Z ↕';
-  const now = state === 'asc' ? 'Sorted A–Z' : state === 'desc' ? 'Sorted Z–A' : 'Custom order (drag topics to rearrange)';
+  const label = state === 'asc' ? '↑' : state === 'desc' ? '↓' : '↕';
+  const now = state === 'asc' ? 'Sorted A–Z' : state === 'desc' ? 'Sorted Z–A' : `Custom order`;
   return (
-    <button className={`sort-btn${state ? ' on' : ''}`} onClick={() => sortTopics(next)} title={`${now}. Click to sort ${next === 'asc' ? 'A–Z' : 'Z–A'}.`}>
+    <button
+      className={`sort-btn${state ? ' on' : ''}`}
+      onClick={() => onSort(next)}
+      title={`${now}. Click to sort the ${what} ${next === 'asc' ? 'A–Z' : 'Z–A'}.`}
+      aria-label={`Sort the ${what} ${next === 'asc' ? 'A to Z' : 'Z to A'}`}
+    >
       {label}
     </button>
   );
@@ -458,6 +559,8 @@ function Row(p: {
   onDragEnd?(): void;
   onDragOver?(e: DragEvent): void;
   onDrop?(e: DragEvent): void;
+  /** Tree rows: chevron to fold the upstream rows (null = a leaf, which keeps the space for alignment). */
+  fold?: { open: boolean; onToggle(): void; hiddenCount: number } | null;
 }) {
   const cls = ['ex-row', p.active && 'active', p.hidden && 'is-hidden', p.dragging && 'dragging', p.dropZone && `drop-${p.dropZone}`]
     .filter(Boolean)
@@ -473,6 +576,14 @@ function Row(p: {
       onDragOver={p.onDragOver}
       onDrop={p.onDrop}
     >
+      {p.fold !== undefined &&
+        (p.fold ? (
+          <button className="fold" onClick={p.fold.onToggle} aria-expanded={p.fold.open} title={p.fold.open ? 'Fold its upstream systems' : 'Show its upstream systems'}>
+            {p.fold.open ? '▾' : '▸'}
+          </button>
+        ) : (
+          <span className="fold-spacer" />
+        ))}
       {p.draggable && <span className="grip" title="Drag to move">⋮⋮</span>}
       {p.onCheck ? (
         <input type="checkbox" checked={!!p.checked} onChange={p.onCheck} title="Focus the view on this (filter)" />
@@ -487,6 +598,7 @@ function Row(p: {
           {p.label}
         </button>
       )}
+      {p.fold && !p.fold.open && <span className="fold-count" title={`${p.fold.hiddenCount} upstream systems folded`}>{p.fold.hiddenCount}</span>}
       {p.badge && <span className="badge">{p.badge}</span>}
       {p.extra}
       {p.onToggleHidden && (
