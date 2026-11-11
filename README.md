@@ -38,6 +38,9 @@ Switch the toolbar from **Topics** to **System of System**. Inner systems sit in
 
 [![System of System view](docs/images/sos.png)](https://scodeman.github.io/Topico/)
 
+### Discuss it in place
+Set your name with the user icon (top right), then right-click any system, topic or line on the canvas to leave a comment. Items with unresolved comments carry a small numbered circle: click it to jump to the thread in the right panel, where comments can be replied to, accepted or rejected, and threads closed or removed. Every comment and action keeps its author and date.
+
 ### Take it with you
 Export any view, including a focused view, the chain tube or the SoS view, to **SVG** or **draw.io**. While a chain is animating, the draw.io file has one page per step, with draw.io's own flow animation.
 
@@ -94,7 +97,8 @@ The model is saved automatically in the browser (localStorage). Use **Save JSON*
   - While a chain is animating, **draw.io** export writes an overview page plus one page per step, with draw.io's flow animation on the current links. **SVG** export captures the current step.
 - Click **View** on a chain in the left panel to see it as a broker tube: topics are bars inside the tube, and the chain's systems sit around it. Click again, or use "Back to Topics", to return. SVG and draw.io export the tube view while it is shown.
 - **Group topics** collapses topics into one tab per bundle or per chain.
-- Hide the canvas legend with its ×, and bring it back with the **Legend** button.
+- Hide the canvas legend (it lists the chains) with its ×, and bring it back with the **Legend** button.
+- **Comments**: every pane in the right panel has a Comments section, and right-clicking an item on the canvas comments on it inline. Saved JSON files store the threads compressed; SVG and draw.io exports leave them out.
 - **Topic names** in the toolbar sets how a name longer than its box is shown: rolling text, a smaller font, or wider boxes.
 - The layout is recomputed on every change. It sizes boxes to their content, reorders tabs to reduce crossings and keeps bundle members together, and it never lets boxes overlap.
 

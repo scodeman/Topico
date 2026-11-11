@@ -1,4 +1,4 @@
-import type { MouseEvent, SVGProps } from 'react';
+import type { MouseEvent, ReactNode, SVGProps } from 'react';
 import type { SosLayout, SosNode } from '../engine/sosView';
 import { COLORS } from './DiagramSvg';
 
@@ -16,6 +16,8 @@ export interface SosSvgProps {
   handlers?: SosHandlers;
   standalone?: boolean;
   svgProps?: SVGProps<SVGSVGElement>;
+  /** Drawn on top (screen only, e.g. comment markers). */
+  overlay?: ReactNode;
 }
 
 const truncate = (s: string, max: number) => (s.length > max ? `${s.slice(0, Math.max(1, max - 1))}…` : s);
@@ -141,6 +143,7 @@ export function SosSvg(p: SosSvgProps) {
           No system is part of the SoS view yet. Set systems as Inner or Outer.
         </text>
       )}
+      {p.overlay}
     </svg>
   );
 }

@@ -109,6 +109,7 @@ export function DiagramSvg(p: DiagramProps) {
     return (
       <g
         key={tg.key}
+        data-tab={handlers ? tg.topicId : undefined}
         transform={at(tg.rect)}
         style={{ ...move(tg.rect), cursor: handlers ? 'pointer' : undefined, opacity: dim(tg.topicId) }}
         onClick={handlers ? (e) => handlers.onTabClick(tg.topicId, e) : undefined}
@@ -185,7 +186,8 @@ export function DiagramSvg(p: DiagramProps) {
             const lit = state === 'active' || state === 'done';
             const col = lit ? anim.color : COLORS.muted;
             return (
-              <g key={e.id} opacity={{ active: 1, done: 0.85, pending: 0.3, off: 0.08 }[state]}>
+              <g key={e.id} opacity={{ active: 1, done: 0.85, pending: 0.3, off: 0.08 }[state]} data-edge={handlers ? e.id : undefined}>
+                {handlers && <path d={e.d} stroke="transparent" strokeWidth={10} pointerEvents="stroke" />}
                 <path
                   d={e.d}
                   stroke={col}
@@ -206,7 +208,9 @@ export function DiagramSvg(p: DiagramProps) {
           const opacity = (hit ? 1 : 0.12) * 0.9;
           const DASH = 8;
           return (
-            <g key={e.id} opacity={opacity}>
+            <g key={e.id} opacity={opacity} data-edge={handlers ? e.id : undefined}>
+              {/* Screen only: a wide invisible stroke, so the thin line is easy to right-click. */}
+              {handlers && <path d={e.d} stroke="transparent" strokeWidth={10} pointerEvents="stroke" />}
               <title>{e.chainIds.length ? `Chains: ${e.chainIds.map((x) => groups.find((g) => g.id === x)?.name).join(', ')}` : ''}</title>
               <path d={e.d} stroke={c} strokeWidth={width} markerEnd={`url(#${markerId(c)})`} style={style} />
               {/* Shared by several chains: overlay alternating dashes in each further chain colour. */}

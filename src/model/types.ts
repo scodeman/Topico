@@ -1,3 +1,5 @@
+import { readComments, type CommentThread } from './comments';
+
 export type Side = 'W' | 'N' | 'E' | 'S';
 export const SIDES: Side[] = ['W', 'N', 'E', 'S'];
 export const SIDE_LABEL: Record<Side, string> = { W: 'West', N: 'North', E: 'East', S: 'South' };
@@ -101,6 +103,8 @@ export interface SosSettings {
 
 export interface Model {
   version: 1;
+  /** Comment threads on the broker, systems, topics, groups and lines. Stored compressed in exported files. */
+  comments: CommentThread[];
   centre: Centre;
   systems: SystemNode[];
   topics: Topic[];
@@ -130,6 +134,7 @@ export function emptyModel(): Model {
     interactions: [],
     groups: [],
     sos: defaultSosSettings(),
+    comments: [],
   };
 }
 
@@ -145,6 +150,7 @@ export function normalizeModel(raw: unknown): Model {
     interactions?: (Partial<Interaction> & { chainId?: string | null })[];
     groups?: Partial<Group>[];
     sos?: Partial<Omit<SosSettings, 'callouts'>> & { callouts?: Partial<SosCalloutOptions> };
+    comments?: unknown;
   };
   const base = emptyModel();
   const sysDefaults: Omit<SystemNode, 'id' | 'name'> = {
@@ -177,6 +183,7 @@ export function normalizeModel(raw: unknown): Model {
     }),
     groups: (m.groups ?? []).map((g) => ({ description: '', color: '#6366f1', hidden: false, sequence: [], ...g }) as Group),
     sos: { ...sos, ...(m.sos ?? {}), callouts: { ...sos.callouts, ...(m.sos?.callouts ?? {}) } },
+    comments: readComments(m.comments),
   };
 }
 

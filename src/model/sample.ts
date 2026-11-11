@@ -98,6 +98,21 @@ export function sampleModel(): Model {
     version: 1,
     centre: { id: 'centre', name: 'CENTER SYS', description: 'Central brokering system', properties: [], sos: 'inner' },
     sos: defaultSosSettings(),
+    // One example discussion, so the comment markers show on the sample.
+    comments: [
+      {
+        id: 'ct-sample',
+        target: { kind: 'topic', id: 't3' },
+        entries: [
+          { id: 'ce-1', author: 'Sample reviewer', at: '2026-11-10T09:00:00.000Z', text: 'Should TOPIC 3 move to the Reference data owner?' },
+          { id: 'ce-2', author: 'Sample owner', at: '2026-11-10T10:30:00.000Z', text: 'Agreed, WEST SYS 11 already publishes it.', replyTo: 'ce-1' },
+        ],
+        log: [
+          { action: 'created', by: 'Sample reviewer', at: '2026-11-10T09:00:00.000Z', entryId: 'ce-1' },
+          { action: 'replied', by: 'Sample owner', at: '2026-11-10T10:30:00.000Z', entryId: 'ce-2' },
+        ],
+      },
+    ],
     systems,
     topics,
     interactions,

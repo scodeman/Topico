@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { autoSequence, chainLinks, chainSequence, linkLabel } from '../model/chainLinks';
 import { useStore } from '../model/store';
+import { CommentsPanel } from './CommentsPanel';
 import {
   SIDES,
   SIDE_LABEL,
@@ -31,6 +32,7 @@ export function DetailsPane({ hidden }: { hidden?: boolean }) {
       {focus.kind === 'system' && <SystemPane id={focus.id} />}
       {focus.kind === 'topic' && <TopicPane id={focus.id} />}
       {focus.kind === 'group' && <GroupPane id={focus.id} />}
+      {focus.kind === 'flow' && <FlowPane topicId={focus.topicId} fromId={focus.fromId} toId={focus.toId} />}
     </aside>
   );
 }
@@ -72,6 +74,30 @@ function CentrePane() {
       <p className="muted small">
         {model.systems.length} systems · {model.topics.length} topics · {model.interactions.length} interactions
       </p>
+      <CommentsPanel target={{ kind: 'centre' }} />
+    </div>
+  );
+}
+
+/** One topic's line from one system to another: opened from the canvas, to comment on it. */
+function FlowPane({ topicId, fromId, toId }: { topicId: string; fromId: string; toId: string }) {
+  const model = useStore((s) => s.model);
+  const st = useStore.getState;
+  const sys = (id: string) => model.systems.find((s) => s.id === id);
+  const topic = model.topics.find((t) => t.id === topicId);
+  if (!topic || !sys(fromId) || !sys(toId)) return <p className="muted">This line no longer exists.</p>;
+  return (
+    <div>
+      <h3 className="pane-kind">Line</h3>
+      <p className="flow-title">
+        <button className="link" onClick={() => st().setFocus({ kind: 'system', id: fromId })}>{sys(fromId)!.name}</button>
+        {' → '}
+        <button className="link" onClick={() => st().setFocus({ kind: 'system', id: toId })}>{sys(toId)!.name}</button>
+      </p>
+      <p>
+        Topic: <button className="link" onClick={() => st().setFocus({ kind: 'topic', id: topicId })}>{topic.name}</button>
+      </p>
+      <CommentsPanel target={{ kind: 'flow', topicId, fromId, toId }} />
     </div>
   );
 }
@@ -144,6 +170,7 @@ function SystemPane({ id }: { id: string }) {
         </section>
       ))}
 
+      <CommentsPanel target={{ kind: 'system', id }} />
       <button className="danger" onClick={() => confirm(`Delete ${sys.name}?`) && st().deleteSystem(id)}>Delete system</button>
     </div>
   );
@@ -254,6 +281,7 @@ function TopicPane({ id }: { id: string }) {
         </select>
         <button disabled={!sysId} onClick={() => { st().addInteraction(sysId, id, dir); setSysId(''); }}>Add</button>
       </div>
+      <CommentsPanel target={{ kind: 'topic', id }} />
       <button className="danger" onClick={() => confirm(`Delete ${topic.name}?`) && st().deleteTopic(id)}>Delete topic</button>
     </div>
   );
@@ -314,6 +342,7 @@ function GroupPane({ id }: { id: string }) {
       </div>
       {isBundle ? <BundleMembers groupId={id} /> : <ChainMembers groupId={id} />}
       {!isBundle && <SequenceEditor chainId={id} />}
+      <CommentsPanel target={{ kind: 'group', id }} />
       <button className="danger" onClick={() => confirm(`Delete ${g.name}?`) && st().deleteGroup(id)}>Delete group</button>
     </div>
   );

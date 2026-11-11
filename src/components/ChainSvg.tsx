@@ -1,4 +1,4 @@
-import type { MouseEvent, SVGProps } from 'react';
+import type { MouseEvent, ReactNode, SVGProps } from 'react';
 import type { ChainLayout, ChainNode } from '../engine/chainView';
 import { stepState } from '../engine/animation';
 import type { TopicTextMode } from '../engine/layout';
@@ -20,6 +20,8 @@ export interface ChainSvgProps {
   handlers?: ChainHandlers;
   standalone?: boolean;
   svgProps?: SVGProps<SVGSVGElement>;
+  /** Drawn on top (screen only, e.g. comment markers). */
+  overlay?: ReactNode;
   /** How topic names longer than their bar are shown (default: rolling text). */
   topicText?: TopicTextMode;
   /** Chain sequence being animated: arrows are styled by step, with step numbers. */
@@ -181,6 +183,7 @@ export function ChainSvg(p: ChainSvgProps) {
           No endpoints in this chain yet
         </text>
       )}
+      {p.overlay}
     </svg>
   );
 }

@@ -1,5 +1,6 @@
 import { useRef } from 'react';
 import { useView } from '../engine/useView';
+import { UserMenu } from './UserMenu';
 import { resetToEmpty, resetToSample, useStore } from '../model/store';
 import type { TopicTextMode } from '../engine/layout';
 import type { CollapseBy } from '../engine/view';
@@ -126,6 +127,7 @@ export function Toolbar() {
           <input type="checkbox" checked={ui.sketchExport} onChange={(e) => setUi({ sketchExport: e.target.checked })} /> sketch style
         </label>
       </div>
+      <UserMenu />
     </header>
   );
 }

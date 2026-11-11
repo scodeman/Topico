@@ -11,6 +11,7 @@ import { fitFontSize, labelArea, type Layout, type TabGeom, type TopicTextMode }
 /** draw.io has no rolling text: a topic name always shows in full, at a font size that fits its box. */
 const topicFont = (name: string, length: number) => Math.max(4, Math.floor(fitFontSize(name, length)));
 import type { ViewModel } from '../engine/view';
+import { compressComments } from '../model/comments';
 import type { Group, Model } from '../model/types';
 
 export function toSvg(layout: Layout, vm: ViewModel, groups: Group[], showStubs: boolean, anim?: DiagramProps['anim'], topicText?: TopicTextMode): string {
@@ -282,8 +283,9 @@ export function toSosDrawio(l: SosLayout, opts: { sketch: boolean }): string {
   ].join('\n');
 }
 
+/** The model as a JSON file; comment threads are stored compressed (gzip + base64). */
 export function toJson(model: Model): string {
-  return JSON.stringify(model, null, 2);
+  return JSON.stringify({ ...model, comments: compressComments(model.comments) }, null, 2);
 }
 
 export function download(filename: string, content: string, mime: string) {

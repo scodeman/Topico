@@ -4,6 +4,7 @@ import { immer } from 'zustand/middleware/immer';
 import type { TopicTextMode } from '../engine/layout';
 import type { CollapseBy } from '../engine/view';
 import { duplicateGroup, duplicateSystem, duplicateTopic, moveGroup, moveSystem, moveTopic, sortGroups, sortTopics, type MoveTarget, type SortDir } from './ops';
+import { createThread, decide, pruneThreads, removeEntry, reply, setClosed, type CommentTarget, type Decision } from './comments';
 import { sampleModel } from './sample';
 import {
   CENTRE_ID,
@@ -31,6 +32,8 @@ export type Focus =
   | { kind: 'system'; id: string }
   | { kind: 'topic'; id: string }
   | { kind: 'group'; id: string }
+  /** One topic's line from one system to another (commented from the canvas). */
+  | { kind: 'flow'; topicId: string; fromId: string; toId: string }
   | null;
 
 export interface UiState {
@@ -54,6 +57,12 @@ export interface UiState {
   folded: string[];
   /** The canvas legend is hidden. */
   legendHidden: boolean;
+  /** Name shown as the author of comments; commenting needs one. Kept in this browser only. */
+  userName: string;
+  /** The user menu (top right) is open. */
+  userMenuOpen: boolean;
+  /** Comment thread to scroll to and highlight in the right panel; `nonce` re-triggers it. */
+  commentFocus: { threadId: string; nonce: number } | null;
   /** Side panels: width in pixels, and whether they are collapsed. */
   explorerWidth: number;
   explorerCollapsed: boolean;
@@ -95,6 +104,15 @@ interface Store {
   /** Bundle: topic ids. Chain: interaction (endpoint) ids. */
   setGroupMembers(groupId: string, memberIds: string[]): void;
   setFocus(f: Focus): void;
+  /* Comments: all need a user name, and record who did what and when. */
+  addComment(target: CommentTarget, text: string): string | null;
+  replyComment(threadId: string, text: string, replyTo?: string): void;
+  decideComment(threadId: string, entryId: string, decision: Decision | null): void;
+  closeThread(threadId: string, closed: boolean): void;
+  removeThread(threadId: string): void;
+  removeComment(threadId: string, entryId: string): void;
+  /** Open the right panel on an entity and scroll to one of its threads. */
+  showThread(threadId: string): void;
   /** Toggle an element in the filter. `additive` keeps the current filter (shift-click). */
   filterOn(kind: 'system' | 'topic', id: string, additive: boolean): void;
   clearFilter(): void;
@@ -116,11 +134,24 @@ const initialUi: UiState = {
   topicText: 'scroll',
   folded: [],
   legendHidden: false,
+  userName: '',
+  userMenuOpen: false,
+  commentFocus: null,
   explorerWidth: 260,
   explorerCollapsed: false,
   detailsWidth: 340,
   detailsCollapsed: false,
 };
+
+const actor = (name: string) => (name.trim() ? { by: name.trim(), at: new Date().toISOString() } : null);
+const focusOf = (t: CommentTarget): Focus => (t.kind === 'centre' ? { kind: 'centre' } : t.kind === 'flow' ? { ...t } : { kind: t.kind, id: t.id });
+/** Threads go with the entity they are about. */
+const dropOrphanThreads = (m: Model) =>
+  (m.comments = pruneThreads(m.comments, {
+    system: (id) => m.systems.some((s) => s.id === id),
+    topic: (id) => m.topics.some((t) => t.id === id),
+    group: (id) => m.groups.some((g) => g.id === id),
+  }));
 
 const toggle = (list: string[], id: string) => (list.includes(id) ? list.filter((x) => x !== id) : [...list, id]);
 
@@ -134,8 +165,8 @@ export const useStore = create<Store>()(
         set((s) => {
           s.model = normalizeModel(m);
           // A new model resets the view, not the user's panel layout or export preference.
-          const { sketchExport, topicText, legendHidden, explorerWidth, explorerCollapsed, detailsWidth, detailsCollapsed } = s.ui;
-          s.ui = { ...initialUi, sketchExport, topicText, legendHidden, explorerWidth, explorerCollapsed, detailsWidth, detailsCollapsed };
+          const { sketchExport, topicText, legendHidden, userName, explorerWidth, explorerCollapsed, detailsWidth, detailsCollapsed } = s.ui;
+          s.ui = { ...initialUi, sketchExport, topicText, legendHidden, userName, explorerWidth, explorerCollapsed, detailsWidth, detailsCollapsed };
         }),
       updateCentre: (patch) => set((s) => void Object.assign(s.model.centre, patch)),
       updateSosSettings: ({ callouts, ...rest }) =>
@@ -187,6 +218,7 @@ export const useStore = create<Store>()(
           s.model.interactions = s.model.interactions.filter((i) => i.systemId !== id);
           s.ui.filterSystems = s.ui.filterSystems.filter((x) => x !== id);
           s.ui.focus = null;
+          dropOrphanThreads(s.model);
         }),
 
       moveSystem: (id, target) => set((s) => void moveSystem(s.model, id, target)),
@@ -233,6 +265,7 @@ export const useStore = create<Store>()(
           s.model.interactions = s.model.interactions.filter((i) => i.topicId !== id);
           s.ui.filterTopics = s.ui.filterTopics.filter((x) => x !== id);
           s.ui.focus = null;
+          dropOrphanThreads(s.model);
         }),
 
       addInteraction: (systemId, topicId, direction) =>
@@ -276,6 +309,7 @@ export const useStore = create<Store>()(
           if (s.ui.chainView === id) s.ui.chainView = null;
           if (s.ui.animation?.chainId === id) s.ui.animation = null;
           s.ui.focus = null;
+          dropOrphanThreads(s.model);
         }),
       setGroupMembers: (groupId, memberIds) =>
         set((s) => {
@@ -296,6 +330,48 @@ export const useStore = create<Store>()(
         }),
 
       setFocus: (f) => set((s) => void (s.ui.focus = f)),
+
+      addComment: (target, text) => {
+        let id: string | null = null;
+        set((s) => {
+          const a = actor(s.ui.userName);
+          if (!a || !text.trim()) return;
+          id = createThread(s.model.comments, target, text.trim(), a).id;
+        });
+        return id;
+      },
+      replyComment: (threadId, text, replyTo) =>
+        set((s) => {
+          const a = actor(s.ui.userName);
+          const t = s.model.comments.find((x) => x.id === threadId);
+          if (a && t && text.trim()) reply(t, text.trim(), a, replyTo);
+        }),
+      decideComment: (threadId, entryId, decision) =>
+        set((s) => {
+          const a = actor(s.ui.userName);
+          const t = s.model.comments.find((x) => x.id === threadId);
+          if (a && t) decide(t, entryId, decision, a);
+        }),
+      closeThread: (threadId, closed) =>
+        set((s) => {
+          const a = actor(s.ui.userName);
+          const t = s.model.comments.find((x) => x.id === threadId);
+          if (a && t) setClosed(t, closed, a);
+        }),
+      removeThread: (threadId) => set((s) => void (s.model.comments = s.model.comments.filter((t) => t.id !== threadId))),
+      removeComment: (threadId, entryId) =>
+        set((s) => {
+          const a = actor(s.ui.userName);
+          if (a) s.model.comments = removeEntry(s.model.comments, threadId, entryId, a);
+        }),
+      showThread: (threadId) =>
+        set((s) => {
+          const t = s.model.comments.find((x) => x.id === threadId);
+          if (!t) return;
+          s.ui.focus = focusOf(t.target);
+          s.ui.detailsCollapsed = false;
+          s.ui.commentFocus = { threadId, nonce: (s.ui.commentFocus?.nonce ?? 0) + 1 };
+        }),
       filterOn: (kind, id, additive) =>
         set((s) => {
           if (kind === 'system' && id === CENTRE_ID) {
@@ -321,7 +397,7 @@ export const useStore = create<Store>()(
     {
       name: 'topico',
       version: 1,
-      partialize: (s) => ({ model: s.model, ui: { ...s.ui, hoverTopic: null, animation: null } }),
+      partialize: (s) => ({ model: s.model, ui: { ...s.ui, hoverTopic: null, animation: null, userMenuOpen: false, commentFocus: null } }),
       merge: (persisted, current) => {
         const p = persisted as Partial<Store> | undefined;
         const { topicSort: _dropped, ...ui } = (p?.ui ?? {}) as Partial<UiState> & { topicSort?: unknown };

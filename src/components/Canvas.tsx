@@ -5,6 +5,7 @@ import { canMoveSystem } from '../model/ops';
 import { CENTRE_ID } from '../model/types';
 import { useStore } from '../model/store';
 import { AnimationBar } from './AnimationBar';
+import { CommentBadges, CommentPopover, commentableAt, type Commentable } from './CanvasComments';
 import { ChainSvg, type ChainHandlers } from './ChainSvg';
 import type { Layout } from '../engine/layout';
 import { COLORS, DiagramSvg, type DiagramHandlers } from './DiagramSvg';
@@ -58,6 +59,7 @@ export function Canvas() {
   // Dragging a system on the diagram: same move as in the left panel.
   const nodeDrag = useRef<{ id: string; x: number; y: number; active: boolean } | null>(null);
   const justDragged = useRef(false);
+  const [commenting, setCommenting] = useState<{ at: { x: number; y: number }; item: Commentable } | null>(null);
   const [sysDrag, setSysDrag] = useState<{ id: string; at: { x: number; y: number }; drop: DiagramDrop | null } | null>(null);
   const toDiagram = (e: MouseEvent) => {
     const rect = wrapRef.current!.getBoundingClientRect();
@@ -184,10 +186,24 @@ export function Canvas() {
   if (focus?.kind === 'group') selectedTopics.add(`grp:${focus.id}`);
 
   return (
-    <div className={`canvas${sysDrag ? ' sys-dragging' : ''}`} ref={wrapRef} onMouseMove={onMouseMove} onMouseUp={onMouseUp} onMouseLeave={endDrag}>
+    <div
+      className={`canvas${sysDrag ? ' sys-dragging' : ''}`}
+      ref={wrapRef}
+      onMouseMove={onMouseMove}
+      onMouseUp={onMouseUp}
+      onMouseLeave={endDrag}
+      onContextMenu={(e) => {
+        // Right-click an item to comment on it inline.
+        const item = commentableAt(e.target as Element, vm, model);
+        if (!item) return;
+        e.preventDefault();
+        setCommenting({ at: { x: e.clientX, y: e.clientY }, item });
+      }}
+    >
       {sosLayout ? <SosBar /> : <FilterBar />}
       {sosLayout ? (
         <SosSvg
+          overlay={<CommentBadges model={model} vm={vm} sos={sosLayout} />}
           layout={sosLayout}
           selectedNodes={selectedNodes}
           handlers={sosHandlers}
@@ -200,6 +216,7 @@ export function Canvas() {
         />
       ) : chainLayout ? (
         <ChainSvg
+          overlay={<CommentBadges model={model} vm={vm} chain={chainLayout} />}
           layout={chainLayout}
           topicText={ui.topicText}
           anim={anim ? { arrowSteps: anim.arrowSteps, current: anim.current } : null}
@@ -225,7 +242,12 @@ export function Canvas() {
           selectedTopics={selectedTopics}
           hoverTopic={ui.hoverTopic}
           handlers={handlers}
-          overlay={sysDrag && <DragOverlay layout={layout} drag={sysDrag} />}
+          overlay={
+            <>
+              <CommentBadges model={model} vm={vm} layout={layout} />
+              {sysDrag && <DragOverlay layout={layout} drag={sysDrag} />}
+            </>
+          }
           anim={anim ? { edgeSteps: anim.edgeSteps, current: anim.current, color: anim.color } : null}
           animate
           svgProps={{
@@ -242,6 +264,7 @@ export function Canvas() {
         <button onClick={() => setBox((bx) => zoom(bx, 1.25))} title="Zoom out">−</button>
       </div>
       {!sosLayout && !anim && <Legend />}
+      {commenting && <CommentPopover at={commenting.at} item={commenting.item} onClose={() => setCommenting(null)} />}
       {anim && <AnimationBar anim={anim} />}
       {!chainLayout && !sosLayout && Object.keys(vm.nodes).length === 0 && (
         <div className="empty-hint">Add systems and topics from the left panel to start drawing.</div>
@@ -323,7 +346,9 @@ function FilterBar() {
 
 /** Group legend; clicking a group turns its colouring off or on (bundle outline, chain colours). */
 function Legend() {
-  const groups = useStore((s) => s.model.groups);
+  // Only chains: bundles are shown by their outline and toggled from the left panel.
+  const allGroups = useStore((s) => s.model.groups);
+  const groups = allGroups.filter((g) => g.type === 'chain');
   const updateGroup = useStore((s) => s.updateGroup);
   const hidden = useStore((s) => s.ui.legendHidden);
   const setUi = useStore((s) => s.setUi);

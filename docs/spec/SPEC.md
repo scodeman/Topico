@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Version | 0.23 |
+| Version | 0.24 |
 | Last updated | 2026-11-07 |
 | Reference material | [`images/`](images/) (hand-drawn target views), [`Topico.drawio`](Topico.drawio) (source sketch) |
 
@@ -121,7 +121,7 @@ The built-in sample model (toolbar button **Sample**) recreates ALL.png.
 | GRP-10 | In the chain view, systems sit around the tube on their border: North above, South below, West left, East right. Arrows go from producers into the bar and from the bar to consumers. | Done (tested) | Upstream systems and ETLs stack outside their parent, with a relay arrow labelled with the topic. West/East systems are ordered by the bars they connect to, so their arrows do not cross. Clicking a system or bar opens its details, and hovering a bar highlights its arrows. |
 | GRP-11 | The chain view can be exported as SVG and draw.io. | Done | The broker tube is draw.io's horizontal cylinder ("Direct data") shape. The draw.io output was checked to be well formed but not yet opened in draw.io. |
 | GRP-12 | The colouring of a bundle or chain can be hidden or shown, like topics and systems, from the left panel or the legend. | Done (tested) | ●/◌ on the group's row in the left panel, a click on the group in the canvas legend, or "Hide colouring" in the group pane. A hidden bundle loses its outline. A hidden chain's tabs and arrows go back to the default colour, also in the chain view and the exports. Topics, endpoints and flows stay, and grouping (collapse) still works. Hidden groups are struck through in the legend. |
-| GRP-16 | The canvas legend can be hidden and shown again. | Done | × in the legend's header hides it and leaves a small "Legend" button in its place. Remembered between sessions. Checked in Chrome. |
+| GRP-16 | The canvas legend can be hidden and shown again. It lists only chains: bundles are shown by their outline and toggled from the left panel. | Done | × in the legend's header hides it and leaves a small "Legend" button in its place. Remembered between sessions. Checked in Chrome. |
 | GRP-13 | A chain has a numbered **sequence**: each step holds one or more of the chain's links, and a link can appear in several steps. | Done (tested) | A **link** is one hop of a topic between two endpoints of the chain: producer → consumer through the broker or a parent system, or a relay between a system and its upstream system. The chain pane's Sequence section adds, removes and reorders steps, and adds or removes links in each step. **Auto-fill** proposes an order following the flow: a link comes one step after the links that bring data to the system it starts from. The sample chains come with that sequence. Links that no longer exist are ignored. |
 | GRP-14 | An **animate** mode plays a chain's sequence on the diagram, showing the chain activating progressively. | Done (tested) | Started from ▶ on the chain row in the left panel, or "▶ Animate" in the chain pane. It plays on the main diagram and in the chain (tube) view. The current step's links are drawn thick with a moving dash, earlier steps stay lit, later steps are faded, and other arrows almost disappear. Each link shows its step number. A player bar offers first, previous, play/pause, next and stop, and shows the current step's links. Playback loops every 1.6 s. Not available in the SoS view, where links are merged per system. Checked in Chrome. |
 | GRP-15 | The draw.io export keeps the animation. | Done (tested) | While animating, the draw.io export contains an overview page with every link numbered and the steps listed, plus one page per step. On each step page, the current links use draw.io's flow animation (moving dashes), earlier ones stay lit and later ones are faded, with a caption listing the step's links. Flip through the pages to replay the chain. The SVG export captures the current step, including the moving dash. Well-formed XML, not yet opened in draw.io. |
@@ -187,7 +187,20 @@ The built-in sample model (toolbar button **Sample**) recreates ALL.png.
 | SOS-09 | The topic lines inside the SoS box can be switched on and off. | Done (tested) | **Inside lines** checkbox in the SoS settings bar, saved with the model. Lines between outer systems and the box are always shown. |
 | SOS-10 | When the broker is shown, all inside topic lines go through it. | Done (tested) | The broker is placed in the middle of the box, with the other inner systems in a ring around it, oriented by border like the outer flower. Each inner system has one line to the broker for what it publishes to other shown systems, inside or outside the box, and one line from it for what it reads. When the broker is not shown, inside lines go directly between systems, laid out in a grid. |
 
-### 4.10 Export and persistence
+
+### 4.10 Comments
+
+| ID | Requirement | Status | Notes |
+|---|---|---|---|
+| COM-01 | Each entity (the broker, systems and ETLs, topics, bundles and chains) and each line (one topic from one system to another) can be commented in its right-panel pane, beside its notes and description. | Done (tested) | A Comments section at the end of each pane, and a new **Line** pane for lines. |
+| COM-02 | A user gives a name before commenting, from a user icon at the top right. | Done | The icon shows the user's initials once a name is set. The name is kept in that browser only, not in the model. Without one, comment forms are replaced by a "Set your name" link, and the canvas comment box asks for the name first. Checked in Chrome. |
+| COM-03 | A user can create a comment, reply to a thread or to one comment, accept or reject any comment of a thread, and close (resolve), reopen or remove a thread, or remove a single comment. | Done (tested) | Accepting or rejecting again the same way clears the decision. Removing the first comment keeps the replies. A thread left without comments is removed. Threads go when their entity is deleted. |
+| COM-04 | The author and date of every comment are kept, and so are those of every action. | Done (tested) | Each comment has its author and date, each decision who and when, and each closure who and when. Each thread also keeps a history of every action with its author and date, shown under "History". |
+| COM-05 | Right-clicking an item on the canvas opens an inline box to comment on it. | Done | Systems, ETLs, the broker, topic tabs and lines in the Topics view; systems and topic bars in the chain view; systems in the SoS view. Lines have a wide invisible margin so they are easy to hit. Checked in Chrome. |
+| COM-06 | An item with unresolved comments shows a small numbered circle in its corner, or on its line, giving the number of open threads. | Done | On systems, the broker, topic tabs (every tab of the topic), collapsed group tabs and lines, in the Topics, chain and SoS views. A thread counts until it is closed. Checked in Chrome. |
+| COM-07 | Clicking a circle opens the right panel on the item and brings its comment into view. | Done | The panel reopens if it was collapsed, scrolls to the thread and highlights it. Checked in Chrome. |
+| COM-08 | Comment threads are stored compressed in the exported JSON, and are not part of SVG or draw.io exports. | Done (tested) | `"comments": {"encoding": "gzip+base64", "data": "…"}`, using the fflate library. Files with a plain list of threads also load. The circles and comments exist only on screen. |
+### 4.11 Export and persistence
 
 | ID | Requirement | Status | Notes |
 |---|---|---|---|
@@ -267,7 +280,8 @@ The original request did not settle these points. They were decided during the i
 
 | Date | Version | Change |
 |---|---|---|
-| 2026-11-07 | 0.1 | Initial build covering §4.1–4.6, §4.8 and §4.10. Reference material moved to `docs/spec/`. |
+| 2026-11-07 | 0.1 | Initial build covering §4.1–4.6, §4.8 and §4.11. Reference material moved to `docs/spec/`. |
+| 2026-11-11 | 0.24 | Comments on every entity and line (COM-01 to COM-08). The legend lists only chains. |
 | 2026-11-11 | 0.23 | The main view is called **Topics** in the toolbar switch (Topics / System of System) and its "Back to" links. |
 | 2026-11-11 | 0.22 | Bundles and chains can be rearranged by drag and drop (EXL-16). |
 | 2026-11-11 | 0.21 | Left panel: sorting of bundles and chains, + per border, + System / + ETL in the right-click menu, folding of system rows and borders. Hideable legend (EXL-12 to EXL-15, GRP-16). |
