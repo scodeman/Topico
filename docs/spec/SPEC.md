@@ -210,7 +210,7 @@ The built-in sample model (toolbar button **Sample**) recreates ALL.png.
 | EXP-03 | The model is saved automatically. | Done | Browser localStorage. |
 | EXP-04 | The model can be saved to and loaded from a file. | Done | JSON. Missing fields are filled with defaults on load. |
 | EXP-05 | An existing `.drawio` file can be imported. | **Open** | Not requested. Listed only to track the idea. |
-| EXP-06 | The current file can be saved over, or saved to a new file. | Done | **Save** writes over the file last opened or saved (asks where the first time); **Save as…** asks where, and that file becomes the current one. Chrome and Edge (File System Access API). Other browsers show a single **Save JSON** download. New and Sample forget the current file. |
+| EXP-06 | The current file can be saved over, or saved to a new file. | Done | **Save** writes over the file last opened or saved (asks where the first time); **Save as…** asks where, and that file becomes the current one. Chrome and Edge (File System Access API). The current file is shown next to the buttons and kept across reloads (in IndexedDB); Chrome asks once per visit before writing to it again. Other browsers show a single **Save JSON** download. New and Sample forget the current file. |
 
 ---
 

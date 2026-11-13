@@ -1,8 +1,9 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useView } from '../engine/useView';
 import { DiagramIcon, ImageFileIcon, NewIcon, OpenIcon, SampleIcon, SaveAsIcon, SaveIcon } from './Icons';
 import { UserMenu } from './UserMenu';
 import { resetToEmpty, resetToSample, useStore } from '../model/store';
+import { loadCurrentFile, storeCurrentFile } from '../model/currentFile';
 
 /* File System Access API (Chrome, Edge): not in every browser nor in TypeScript's DOM types. */
 interface FileHandle {
@@ -66,7 +67,15 @@ export function Toolbar() {
     ),
   );
   // The current file (Chrome, Edge): the one opened or last saved with the browser's file pickers. Save writes over it.
-  const [opened, setOpened] = useState<FileHandle | null>(null);
+  // It is kept across reloads (see currentFile.ts), like the diagram itself.
+  const [opened, setOpenedState] = useState<FileHandle | null>(null);
+  const setOpened = (h: FileHandle | null) => {
+    setOpenedState(h);
+    void storeCurrentFile(h);
+  };
+  useEffect(() => {
+    if (picker) void loadCurrentFile<FileHandle>().then((h) => h && setOpenedState(h));
+  }, []);
   const fileName = `${base}.topico.json`;
   const writeTo = async (h: FileHandle, json: string) => {
     if ((await h.requestPermission?.({ mode: 'readwrite' })) === 'denied') throw new Error('permission denied');
@@ -74,19 +83,21 @@ export function Toolbar() {
     await w.write(json);
     await w.close();
   };
-  const save = (as: boolean) =>
-    withExporters(async (ex) => {
-      const json = ex.toJson(model);
-      if (!picker) return ex.download(fileName, json, 'application/json');
-      try {
-        const h = !as && opened ? opened : await picker.save({ ...JSON_TYPES, suggestedName: opened?.name ?? fileName });
-        await writeTo(h, json);
-        setOpened(h);
-      } catch (e) {
-        if ((e as Error).name === 'AbortError') return;
-        if (confirm(`Could not save: ${(e as Error).message}\nDownload a copy instead?`)) ex.download(fileName, json, 'application/json');
-      }
-    });
+  const save = (as: boolean) => async () => {
+    // Ask to write to the current file first, while the click still counts as the user's gesture.
+    if (picker && !as && opened) await opened.requestPermission?.({ mode: 'readwrite' }).catch(() => undefined);
+    const ex = await import('../export/exporters');
+    const json = ex.toJson(model);
+    if (!picker) return ex.download(fileName, json, 'application/json');
+    try {
+      const h = !as && opened ? opened : await picker.save({ ...JSON_TYPES, suggestedName: opened?.name ?? fileName });
+      await writeTo(h, json);
+      setOpened(h);
+    } catch (e) {
+      if ((e as Error).name === 'AbortError') return;
+      if (confirm(`Could not save: ${(e as Error).message}\nDownload a copy instead?`)) ex.download(fileName, json, 'application/json');
+    }
+  };
 
   const importJson = async (file: File) => {
     try {
@@ -140,6 +151,11 @@ export function Toolbar() {
             <button className="icon-btn" onClick={save(true)} title="Save as…: save to a new file, which becomes the current one" aria-label="Save as">
               <SaveAsIcon />
             </button>
+            {opened && (
+              <span className="current-file" title={`Current file: Save writes to ${opened.name}`}>
+                {opened.name}
+              </span>
+            )}
           </>
         ) : (
           <button className="icon-btn" onClick={save(false)} title="Save JSON: download the diagram as a file" aria-label="Save JSON">

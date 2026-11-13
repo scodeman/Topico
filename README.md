@@ -68,7 +68,7 @@ Requirements, their status and the design decisions are tracked in [docs/spec/SP
 
 Arrows are derived automatically. Inside each container (the broker or a system), every producer of a topic points to every consumer of that topic. A system relays a topic to its upstream systems: what it consumes from the broker it passes to its children, and the reverse.
 
-The model is saved automatically in the browser (localStorage). Use **Open…** and **Save** to keep files. In Chrome and Edge, **Save** writes over the file you opened or last saved, and **Save as…** saves to a new file. Other browsers show **Save JSON**, which downloads a copy.
+The model is saved automatically in the browser (localStorage). Use **Open…** and **Save** to keep files. In Chrome and Edge, **Save** writes over the file you opened or last saved (its name shows next to the buttons, and it is remembered after a reload), and **Save as…** saves to a new file. Other browsers show **Save JSON**, which downloads a copy.
 
 ## How to
 
