@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useView } from '../engine/useView';
 import { DiagramIcon, ImageFileIcon, NewIcon, OpenIcon, SampleIcon, SaveAsIcon, SaveIcon } from './Icons';
+import { CollabMenu } from './CollabMenu';
 import { UserMenu } from './UserMenu';
 import { resetToEmpty, resetToSample, useStore } from '../model/store';
 import { loadCurrentFile, storeCurrentFile } from '../model/currentFile';
@@ -182,6 +183,7 @@ export function Toolbar() {
           <DiagramIcon /> draw.io
         </button>
       </div>
+      <CollabMenu />
       <UserMenu />
     </header>
   );

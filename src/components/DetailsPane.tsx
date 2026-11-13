@@ -67,6 +67,11 @@ function Help() {
         <li>Double-click the broker (or "Show all") to see everything.</li>
         <li>Use the checkboxes on the left to filter, and ● / ◌ to hide or show.</li>
         <li>Hover a topic to highlight its flows. Scroll to zoom, drag to pan.</li>
+        <li>
+          <b>Collaborate</b> (people icon, top right, Chrome and Edge; experiment): choose a folder your team already shares (OneDrive,
+          SharePoint, a network drive). Everyone who picks the same folder connects directly, with no server. Only who is online is
+          shared for now, not the diagram.
+        </li>
       </ul>
     </div>
   );

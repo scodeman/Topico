@@ -248,3 +248,20 @@ fieldset.lock:disabled button.link { display: none; }
 .toolbar .icon-btn .icon { width: 17px; height: 17px; opacity: .85; }
 .toolbar .icon-btn:hover .icon { opacity: 1; }
 .toolbar .current-file { font-size: 12px; color: var(--muted, #64748b); max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Collaborate (experiment): meet others through a shared folder. */
+.collab-menu { position: relative; }
+.toolbar .collab-btn { position: relative; }
+.toolbar .collab-btn.on { border-color: #16a34a; color: #15803d; }
+.collab-count { position: absolute; top: -6px; right: -6px; min-width: 16px; height: 16px; border-radius: 8px; background: #16a34a; color: #fff; font-size: 10px; font-weight: 700; display: grid; place-items: center; padding: 0 3px; }
+.collab-pop { width: 300px; }
+.collab-pop h4 { margin: 0 0 6px; }
+.collab-peers { list-style: none; padding: 0; margin: 6px 0; display: flex; flex-direction: column; gap: 4px; }
+.collab-peers li { display: grid; grid-template-columns: 10px auto; column-gap: 6px; align-items: center; }
+.collab-peers li .muted { grid-column: 2; }
+.collab-dot { width: 8px; height: 8px; border-radius: 50%; background: #cbd5e1; }
+.collab-peers li.calling .collab-dot, .collab-peers li.answering .collab-dot { background: #f59e0b; }
+.collab-peers li.connected .collab-dot { background: #16a34a; }
+.collab-log { font-size: 11px; margin-top: 6px; }
+.collab-log ul { max-height: 120px; overflow: auto; padding-left: 14px; margin: 4px 0; }
+.danger-text { color: #b91c1c; }
