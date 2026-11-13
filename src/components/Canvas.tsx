@@ -3,11 +3,12 @@ import { dropTargetAt, type DiagramDrop } from '../engine/dropTarget';
 import { useView } from '../engine/useView';
 import { canMoveSystem } from '../model/ops';
 import { CENTRE_ID } from '../model/types';
-import { useStore } from '../model/store';
+import { canEdit, useStore } from '../model/store';
 import { AnimationBar } from './AnimationBar';
 import { CommentBadges, CommentPopover, commentableAt, type Commentable } from './CanvasComments';
 import { ChainSvg, type ChainHandlers } from './ChainSvg';
-import type { Layout } from '../engine/layout';
+import type { Layout, TopicTextMode } from '../engine/layout';
+import type { CollapseBy } from '../engine/view';
 import { COLORS, DiagramSvg, type DiagramHandlers } from './DiagramSvg';
 import { SosBar } from './SosBar';
 import { SosSvg, type SosHandlers } from './SosSvg';
@@ -26,6 +27,15 @@ export function Canvas() {
   const setUi = useStore((s) => s.setUi);
   const moveSystem = useStore((s) => s.moveSystem);
   const wrapRef = useRef<HTMLDivElement>(null);
+  // The animation bar sits above the bottom dock, whose height changes when it wraps.
+  const dockRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const dock = dockRef.current;
+    if (!dock) return;
+    const ro = new ResizeObserver(() => wrapRef.current?.style.setProperty('--dock-h', `${dock.offsetHeight}px`));
+    ro.observe(dock);
+    return () => ro.disconnect();
+  }, []);
   const bounds = chainLayout?.bounds ?? sosLayout?.bounds ?? layout.bounds;
   const [box, setBox] = useState<Box>(bounds);
   const drag = useRef<{ x: number; y: number; box: Box; moved: boolean } | null>(null);
@@ -148,7 +158,7 @@ export function Canvas() {
       },
       onHoverTopic: (topicId) => setUi({ hoverTopic: topicId }),
       onNodeMouseDown: (id, e) => {
-        if (e.button === 0) nodeDrag.current = { id, x: e.clientX, y: e.clientY, active: false };
+        if (e.button === 0 && canEdit(useStore.getState().ui)) nodeDrag.current = { id, x: e.clientX, y: e.clientY, active: false };
       },
     }),
     [setFocus, filterOn, setUi],
@@ -258,16 +268,93 @@ export function Canvas() {
           }}
         />
       )}
-      <div className="canvas-tools">
+      <div className="canvas-tools" ref={dockRef}>
+        {!ui.dockCollapsed && !sosLayout && (
+          <div className="dock-options">
+          <label className="dock-field" title="How topic names longer than their box are shown">
+            <span>Topic names</span>
+            <select value={ui.topicText} onChange={(e) => setUi({ topicText: e.target.value as TopicTextMode })}>
+              <option value="scroll">rolling</option>
+              <option value="shrink">small font</option>
+              <option value="fit">wider boxes</option>
+            </select>
+          </label>
+        {!chainLayout && (
+          <>
+            <label className="dock-field">
+              <span>Group topics</span>
+              <select value={ui.collapseBy} onChange={(e) => setUi({ collapseBy: e.target.value as CollapseBy })}>
+                <option value="none">individually</option>
+                <option value="bundle">by bundle</option>
+                <option value="chain">by chain</option>
+              </select>
+            </label>
+            <SettingsMenu />
+          </>
+        )}
+          </div>
+        )}
+        <div className="dock-zoom">
+        {!sosLayout && (
+          <button
+            className="dock-toggle"
+            onClick={() => setUi({ dockCollapsed: !ui.dockCollapsed })}
+            title={ui.dockCollapsed ? 'Show the view options' : 'Hide the view options'}
+            aria-expanded={!ui.dockCollapsed}
+          >
+            {ui.dockCollapsed ? '‹' : '›'}
+          </button>
+        )}
         <button onClick={fit} title="Fit to screen">Fit</button>
         <button onClick={() => setBox((bx) => zoom(bx, 0.8))} title="Zoom in">+</button>
         <button onClick={() => setBox((bx) => zoom(bx, 1.25))} title="Zoom out">−</button>
+        </div>
       </div>
       {!sosLayout && !anim && <Legend />}
       {commenting && <CommentPopover at={commenting.at} item={commenting.item} onClose={() => setCommenting(null)} />}
       {anim && <AnimationBar anim={anim} />}
       {!chainLayout && !sosLayout && Object.keys(vm.nodes).length === 0 && (
         <div className="empty-hint">Add systems and topics from the left panel to start drawing.</div>
+      )}
+    </div>
+  );
+}
+
+/** Bottom dock: the Topics-view display switches, as a dropdown of checkboxes. */
+function SettingsMenu() {
+  const ui = useStore((s) => s.ui);
+  const setUi = useStore((s) => s.setUi);
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const close = (e: Event) => {
+      if (e instanceof KeyboardEvent ? e.key === 'Escape' : !(e.target instanceof Node && ref.current?.contains(e.target))) setOpen(false);
+    };
+    window.addEventListener('mousedown', close);
+    window.addEventListener('keydown', close);
+    return () => {
+      window.removeEventListener('mousedown', close);
+      window.removeEventListener('keydown', close);
+    };
+  }, [open]);
+  const on = [ui.sharedOnly && 'Shared only', ui.showStubs && 'Off-view'].filter(Boolean);
+  return (
+    <div className="dock-field dock-multi" ref={ref}>
+      <span>Settings</span>
+      <button onClick={() => setOpen(!open)} aria-expanded={open} aria-haspopup="true" title={on.length ? on.join(', ') : 'No settings on'}>
+        <span className="dock-value">{on.length ? on.join(', ') : 'none'}</span>
+        <span aria-hidden>▴</span>
+      </button>
+      {open && (
+        <div className="dock-pop" role="menu">
+          <label title="When several systems are focused, only show topics exchanged between them">
+            <input type="checkbox" checked={ui.sharedOnly} onChange={(e) => setUi({ sharedOnly: e.target.checked })} /> Shared only
+          </label>
+          <label title="Dashed arrows show flows to/from systems outside the current focus">
+            <input type="checkbox" checked={ui.showStubs} onChange={(e) => setUi({ showStubs: e.target.checked })} /> Off-view flows
+          </label>
+        </div>
       )}
     </div>
   );

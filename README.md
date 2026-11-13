@@ -68,7 +68,7 @@ Requirements, their status and the design decisions are tracked in [docs/spec/SP
 
 Arrows are derived automatically. Inside each container (the broker or a system), every producer of a topic points to every consumer of that topic. A system relays a topic to its upstream systems: what it consumes from the broker it passes to its children, and the reverse.
 
-The model is saved automatically in the browser (localStorage). Use **Save JSON** and **Open…** to keep files.
+The model is saved automatically in the browser (localStorage). Use **Open…** and **Save** to keep files. In Chrome and Edge, **Save** writes over the file you opened or last saved, and **Save as…** saves to a new file. Other browsers show **Save JSON**, which downloads a copy.
 
 ## How to
 
@@ -78,10 +78,12 @@ The model is saved automatically in the browser (localStorage). Use **Save JSON*
   - Several systems: only the topics they exchange (turn off *Shared only* to see all of their topics).
   - Topics: only the systems that produce or consume them.
   - The broker, or **Show all**: everything.
-- Dashed arrows (*Off-view flows*) show that a topic also flows to or from systems outside the current focus.
+- Dashed arrows (*Off-view flows*, under **Settings** at the bottom right of the canvas) show that a topic also flows to or from systems outside the current focus.
 - Both side panels have a handle next to the canvas: drag it to resize the panel, double-click it to reset the width, and use ‹ / › to collapse or show the panel.
 - **Drag a system on the diagram** to reorder it, move it to another border or attach it to another parent. It follows the same rules as dragging it in the left panel, which updates by itself. Escape cancels.
+- **Set your name first** with the user icon (top right): until then the diagram is read-only. Without a name you can still browse, search, filter, fold and hide or show items, but nothing can be added, moved, renamed or deleted, and the right panel cannot be edited. The name is not a password; it only records who did what.
 - In the left panel:
+  - The Systems, Topics, Bundles and Chains sections start folded: click a heading to open it. The ones you open stay open in this browser, and searching opens them all.
   - Drag a system by its ⋮⋮ handle. Drop it above or below another row to reorder, on a border heading to move it to that border, or on the middle of a row to make it upstream of that system. The canvas follows the order in the left panel.
   - Topics: drag topics to reorder them. The sort button in the section header shows ↑ (A–Z), ↓ (Z–A) or ↕ (custom order). Click it to sort A–Z, or Z–A when the list is already A–Z.
   - Fold a parent's upstream systems with its ▾ chevron, or a whole border with the chevron on its heading. ⊟ and ⊞ on a border fold or unfold all of its rows, and **+** adds a system on that border.
@@ -96,16 +98,16 @@ The model is saved automatically in the browser (localStorage). Use **Save JSON*
   - Click ▶ on the chain row, or **▶ Animate** in the pane, to play the sequence on the diagram and in the chain view. Use the player bar to pause or step through.
   - While a chain is animating, **draw.io** export writes an overview page plus one page per step, with draw.io's flow animation on the current links. **SVG** export captures the current step.
 - Click **View** on a chain in the left panel to see it as a broker tube: topics are bars inside the tube, and the chain's systems sit around it. Click again, or use "Back to Topics", to return. SVG and draw.io export the tube view while it is shown.
-- **Group topics** collapses topics into one tab per bundle or per chain.
+- **Group topics** (bottom right of the canvas) collapses topics into one tab per bundle or per chain.
 - Hide the canvas legend (it lists the chains) with its ×, and bring it back with the **Legend** button.
 - **Comments**: every pane in the right panel has a Comments section, and right-clicking an item on the canvas comments on it inline. Saved JSON files store the threads compressed; SVG and draw.io exports leave them out.
-- **Topic names** in the toolbar sets how a name longer than its box is shown: rolling text, a smaller font, or wider boxes.
+- **Topic names**, at the bottom right of the canvas, sets how a name longer than its box is shown: rolling text, a smaller font, or wider boxes. The **›** button left of Fit folds these view options away, and **‹** brings them back.
 - The layout is recomputed on every change. It sizes boxes to their content, reorders tabs to reduce crossings and keeps bundle members together, and it never lets boxes overlap.
 
 ## Export
 
 - **SVG**: the current view, as a standalone file.
-- **draw.io**: an mxGraph `.drawio` file of the current view, which opens in diagrams.net or the draw.io desktop app. Tick *sketch style* to get the hand-drawn look.
+- **draw.io**: an mxGraph `.drawio` file of the current view, which opens in diagrams.net or the draw.io desktop app.
 
 ## Publishing (GitLab Pages or GitHub Pages)
 

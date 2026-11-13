@@ -43,7 +43,6 @@ export interface UiState {
   collapseBy: CollapseBy;
   sharedOnly: boolean;
   showStubs: boolean;
-  sketchExport: boolean;
   hoverTopic: string | null;
   /** Chain shown in the broker-tube view, or null. Takes precedence over `view`. */
   chainView: string | null;
@@ -57,6 +56,10 @@ export interface UiState {
   folded: string[];
   /** The canvas legend is hidden. */
   legendHidden: boolean;
+  /** Bottom dock of the canvas folded down to Fit / + / −. */
+  dockCollapsed: boolean;
+  /** Left panel sections (Systems, Topics, Bundles, Chains) the user has opened; all are folded by default. */
+  openSections: string[];
   /** Name shown as the author of comments; commenting needs one. Kept in this browser only. */
   userName: string;
   /** The user menu (top right) is open. */
@@ -126,7 +129,6 @@ const initialUi: UiState = {
   collapseBy: 'none',
   sharedOnly: true,
   showStubs: true,
-  sketchExport: false,
   hoverTopic: null,
   chainView: null,
   view: 'diagram',
@@ -134,6 +136,8 @@ const initialUi: UiState = {
   topicText: 'scroll',
   folded: [],
   legendHidden: false,
+  dockCollapsed: false,
+  openSections: [],
   userName: '',
   userMenuOpen: false,
   commentFocus: null,
@@ -153,20 +157,43 @@ const dropOrphanThreads = (m: Model) =>
     group: (id) => m.groups.some((g) => g.id === id),
   }));
 
+/** Actions that change the diagram: they need a user name (see `canEdit`). Opening a file, the sample or a new
+    diagram, the view and the SoS display options do not. Showing or hiding an element (the left panel's ● / ◌) is a view
+    change and stays open to everyone. */
+const EDITS = [
+  'updateCentre', 'addSystem', 'updateSystem', 'deleteSystem', 'moveSystem', 'duplicateSystem', 'duplicateTopic', 'duplicateGroup',
+  'moveTopic', 'sortTopics', 'sortGroups', 'moveGroup', 'addTopic', 'updateTopic', 'deleteTopic', 'addInteraction',
+  'updateInteraction', 'deleteInteraction', 'addGroup', 'updateGroup', 'deleteGroup', 'setGroupMembers', 'removeThread', 'removeComment',
+] as const satisfies readonly (keyof Store)[];
+const HIDE_ONLY = new Set<string>(['updateSystem', 'updateTopic', 'updateGroup']);
+const hideOnly = (patch: unknown) => !!patch && typeof patch === 'object' && Object.keys(patch).every((k) => k === 'hidden');
+
+/** Whether the user may change the diagram: only once they have given their name. */
+export const canEdit = (ui: Pick<UiState, 'userName'>) => !!ui.userName.trim();
+
+function editGuard(get: () => Store, store: Store): Store {
+  const guarded = { ...store } as Record<string, unknown>;
+  for (const name of EDITS) {
+    const fn = store[name] as (...a: unknown[]) => unknown;
+    guarded[name] = (...a: unknown[]) => (canEdit(get().ui) || (HIDE_ONLY.has(name) && hideOnly(a[1])) ? fn(...a) : '');
+  }
+  return guarded as unknown as Store;
+}
+
 const toggle = (list: string[], id: string) => (list.includes(id) ? list.filter((x) => x !== id) : [...list, id]);
 
 export const useStore = create<Store>()(
   persist(
-    immer((set) => ({
+    immer((set, get) => editGuard(get, {
       model: sampleModel(),
       ui: initialUi,
 
       setModel: (m) =>
         set((s) => {
           s.model = normalizeModel(m);
-          // A new model resets the view, not the user's panel layout or export preference.
-          const { sketchExport, topicText, legendHidden, userName, explorerWidth, explorerCollapsed, detailsWidth, detailsCollapsed } = s.ui;
-          s.ui = { ...initialUi, sketchExport, topicText, legendHidden, userName, explorerWidth, explorerCollapsed, detailsWidth, detailsCollapsed };
+          // A new model resets the view, not the user's panel layout or display preferences.
+          const { topicText, legendHidden, dockCollapsed, openSections, userName, explorerWidth, explorerCollapsed, detailsWidth, detailsCollapsed } = s.ui;
+          s.ui = { ...initialUi, topicText, legendHidden, dockCollapsed, openSections, userName, explorerWidth, explorerCollapsed, detailsWidth, detailsCollapsed };
         }),
       updateCentre: (patch) => set((s) => void Object.assign(s.model.centre, patch)),
       updateSosSettings: ({ callouts, ...rest }) =>
@@ -400,7 +427,8 @@ export const useStore = create<Store>()(
       partialize: (s) => ({ model: s.model, ui: { ...s.ui, hoverTopic: null, animation: null, userMenuOpen: false, commentFocus: null } }),
       merge: (persisted, current) => {
         const p = persisted as Partial<Store> | undefined;
-        const { topicSort: _dropped, ...ui } = (p?.ui ?? {}) as Partial<UiState> & { topicSort?: unknown };
+        // Settings that no longer exist are dropped.
+        const { topicSort: _dropped, sketchExport: _sketch, ...ui } = (p?.ui ?? {}) as Partial<UiState> & { topicSort?: unknown; sketchExport?: unknown };
         return { ...current, model: p?.model ? normalizeModel(p.model) : current.model, ui: { ...initialUi, ...ui } };
       },
     },

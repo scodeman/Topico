@@ -1,9 +1,22 @@
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import { useView } from '../engine/useView';
+import { DiagramIcon, ImageFileIcon, NewIcon, OpenIcon, SampleIcon, SaveAsIcon, SaveIcon } from './Icons';
 import { UserMenu } from './UserMenu';
 import { resetToEmpty, resetToSample, useStore } from '../model/store';
-import type { TopicTextMode } from '../engine/layout';
-import type { CollapseBy } from '../engine/view';
+
+/* File System Access API (Chrome, Edge): not in every browser nor in TypeScript's DOM types. */
+interface FileHandle {
+  name: string;
+  getFile(): Promise<File>;
+  createWritable(): Promise<{ write(data: string): Promise<void>; close(): Promise<void> }>;
+  requestPermission?(o: { mode: 'readwrite' }): Promise<'granted' | 'denied' | 'prompt'>;
+}
+type PickerTypes = { types: { description: string; accept: Record<string, string[]> }[] };
+type OpenPicker = (o: PickerTypes) => Promise<FileHandle[]>;
+type SavePicker = (o: PickerTypes & { suggestedName: string }) => Promise<FileHandle>;
+const fsa = window as unknown as { showOpenFilePicker?: OpenPicker; showSaveFilePicker?: SavePicker };
+const picker = fsa.showOpenFilePicker && fsa.showSaveFilePicker ? { open: fsa.showOpenFilePicker.bind(window), save: fsa.showSaveFilePicker.bind(window) } : null;
+const JSON_TYPES: PickerTypes = { types: [{ description: 'Topico diagram', accept: { 'application/json': ['.json'] } }] };
 
 export function Toolbar() {
   const { model, ui, vm, layout, chainLayout, sosLayout, anim } = useView();
@@ -41,11 +54,10 @@ export function Toolbar() {
     ex.download(
       `${base}${suffix}${animSuffix}.drawio`,
       chainLayout
-        ? ex.toChainDrawio(chainLayout, { sketch: ui.sketchExport, anim: drawioAnim(anim?.arrowSteps ?? new Map()) })
+        ? ex.toChainDrawio(chainLayout, { anim: drawioAnim(anim?.arrowSteps ?? new Map()) })
         : sosLayout
-          ? ex.toSosDrawio(sosLayout, { sketch: ui.sketchExport })
+          ? ex.toSosDrawio(sosLayout)
           : ex.toDrawio(layout, vm, model.groups, {
-              sketch: ui.sketchExport,
               showStubs: ui.showStubs,
               title: model.centre.name,
               anim: drawioAnim(anim?.edgeSteps ?? new Map()),
@@ -53,23 +65,62 @@ export function Toolbar() {
       'application/xml',
     ),
   );
-  const saveJson = withExporters((ex) => ex.download(`${base}.topico.json`, ex.toJson(model), 'application/json'));
+  // The current file (Chrome, Edge): the one opened or last saved with the browser's file pickers. Save writes over it.
+  const [opened, setOpened] = useState<FileHandle | null>(null);
+  const fileName = `${base}.topico.json`;
+  const writeTo = async (h: FileHandle, json: string) => {
+    if ((await h.requestPermission?.({ mode: 'readwrite' })) === 'denied') throw new Error('permission denied');
+    const w = await h.createWritable();
+    await w.write(json);
+    await w.close();
+  };
+  const save = (as: boolean) =>
+    withExporters(async (ex) => {
+      const json = ex.toJson(model);
+      if (!picker) return ex.download(fileName, json, 'application/json');
+      try {
+        const h = !as && opened ? opened : await picker.save({ ...JSON_TYPES, suggestedName: opened?.name ?? fileName });
+        await writeTo(h, json);
+        setOpened(h);
+      } catch (e) {
+        if ((e as Error).name === 'AbortError') return;
+        if (confirm(`Could not save: ${(e as Error).message}\nDownload a copy instead?`)) ex.download(fileName, json, 'application/json');
+      }
+    });
 
   const importJson = async (file: File) => {
     try {
       setModel(JSON.parse(await file.text()));
+      return true;
     } catch (e) {
       alert(`Could not read ${file.name}: ${(e as Error).message}`);
+      return false;
     }
   };
+  const open = async () => {
+    if (!picker) return fileRef.current?.click();
+    try {
+      const [h] = await picker.open(JSON_TYPES);
+      if (await importJson(await h.getFile())) setOpened(h);
+    } catch (e) {
+      if ((e as Error).name !== 'AbortError') alert(`Could not open the file: ${(e as Error).message}`);
+    }
+  };
+  const forget = () => setOpened(null);
 
   return (
     <header className="toolbar">
       <strong className="brand">Topico</strong>
       <div className="tb-group">
-        <button onClick={() => confirm('Start a new empty diagram? Unsaved changes will be lost.') && resetToEmpty()}>New</button>
-        <button onClick={() => confirm('Replace the current diagram with the sample?') && resetToSample()}>Sample</button>
-        <button onClick={() => fileRef.current?.click()}>Open…</button>
+        <button onClick={() => confirm('Start a new empty diagram? Unsaved changes will be lost.') && (resetToEmpty(), forget())} className="icon-btn" title="New: start an empty diagram" aria-label="New">
+          <NewIcon />
+        </button>
+        <button onClick={() => confirm('Replace the current diagram with the sample?') && (resetToSample(), forget())} className="icon-btn" title="Sample: load the example diagram" aria-label="Sample">
+          <SampleIcon />
+        </button>
+        <button onClick={() => void open()} className="icon-btn" title="Open: load a Topico JSON file" aria-label="Open">
+          <OpenIcon />
+        </button>
         <input
           ref={fileRef}
           type="file"
@@ -77,11 +128,24 @@ export function Toolbar() {
           hidden
           onChange={(e) => {
             const f = e.target.files?.[0];
-            if (f) void importJson(f);
+            if (f) void importJson(f).then((ok) => ok && forget());
             e.target.value = '';
           }}
         />
-        <button onClick={saveJson}>Save JSON</button>
+        {picker ? (
+          <>
+            <button className="icon-btn" onClick={save(false)} title={opened ? `Save: over ${opened.name}` : 'Save: choose where to save the diagram'} aria-label="Save">
+              <SaveIcon />
+            </button>
+            <button className="icon-btn" onClick={save(true)} title="Save as…: save to a new file, which becomes the current one" aria-label="Save as">
+              <SaveAsIcon />
+            </button>
+          </>
+        ) : (
+          <button className="icon-btn" onClick={save(false)} title="Save JSON: download the diagram as a file" aria-label="Save JSON">
+            <SaveIcon />
+          </button>
+        )}
       </div>
       <div className="tb-group">
         <span className="seg" role="group" aria-label="View">
@@ -93,39 +157,14 @@ export function Toolbar() {
           </button>
         </span>
       </div>
-      <div className={`tb-group${sosLayout ? ' tb-disabled' : ''}`} title={sosLayout ? 'This option applies to the Topics and chain views' : undefined}>
-        <label title="How topic names longer than their box are shown">
-          Topic names
-          <select value={ui.topicText} onChange={(e) => setUi({ topicText: e.target.value as TopicTextMode })}>
-            <option value="scroll">rolling</option>
-            <option value="shrink">small font</option>
-            <option value="fit">wider boxes</option>
-          </select>
-        </label>
-      </div>
-      <div className={`tb-group${sosLayout || chainLayout ? ' tb-disabled' : ''}`} title={sosLayout || chainLayout ? 'These options apply to the Topics view' : undefined}>
-        <label>
-          Group topics
-          <select value={ui.collapseBy} onChange={(e) => setUi({ collapseBy: e.target.value as CollapseBy })}>
-            <option value="none">individually</option>
-            <option value="bundle">by bundle</option>
-            <option value="chain">by chain</option>
-          </select>
-        </label>
-        <label title="When several systems are focused, only show topics exchanged between them">
-          <input type="checkbox" checked={ui.sharedOnly} onChange={(e) => setUi({ sharedOnly: e.target.checked })} /> Shared only
-        </label>
-        <label title="Dashed arrows show flows to/from systems outside the current focus">
-          <input type="checkbox" checked={ui.showStubs} onChange={(e) => setUi({ showStubs: e.target.checked })} /> Off-view flows
-        </label>
-      </div>
       <div className="tb-group tb-right">
         <span className="muted">Export:</span>
-        <button onClick={exportSvg}>SVG</button>
-        <button onClick={exportDrawio}>draw.io</button>
-        <label title="Use draw.io's hand-drawn sketch style">
-          <input type="checkbox" checked={ui.sketchExport} onChange={(e) => setUi({ sketchExport: e.target.checked })} /> sketch style
-        </label>
+        <button onClick={exportSvg} title="Export the current view as an SVG image">
+          <ImageFileIcon /> SVG
+        </button>
+        <button onClick={exportDrawio} title="Export the current view as a .drawio file, editable in draw.io">
+          <DiagramIcon /> draw.io
+        </button>
       </div>
       <UserMenu />
     </header>

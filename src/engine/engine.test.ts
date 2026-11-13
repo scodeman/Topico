@@ -160,7 +160,7 @@ describe('hiding the colouring of bundles and chains', () => {
     for (const g of m.groups) if (hidden.includes(g.id)) g.hidden = true;
     const vm = computeView(m, base);
     const l = layoutView(vm);
-    return { vm, svg: toSvg(l, vm, m.groups, true), drawio: toDrawio(l, vm, m.groups, { sketch: false, showStubs: true, title: 'x' }), tube: computeChainLayout(m, 'c-order')! };
+    return { vm, svg: toSvg(l, vm, m.groups, true), drawio: toDrawio(l, vm, m.groups, { showStubs: true, title: 'x' }), tube: computeChainLayout(m, 'c-order')! };
   };
   const ORDER = '#f97316';
   const REF = '#0ea5e9';
@@ -287,10 +287,10 @@ describe('topic name display', () => {
     const { toDrawio } = await import('../export/exporters');
     const m = longModel();
     const vm = computeView(m, base);
-    const xml = toDrawio(layoutView(vm, 'scroll'), vm, m.groups, { sketch: false, showStubs: false, title: 'x' });
+    const xml = toDrawio(layoutView(vm, 'scroll'), vm, m.groups, { showStubs: false, title: 'x' });
     expect(xml).toContain(`value="${LONG}"`);
     expect(xml).toMatch(new RegExp(`value="${LONG}" style="[^"]*fontSize=[4-7];`));
-    const wide = toDrawio(layoutView(vm, 'fit'), vm, m.groups, { sketch: false, showStubs: false, title: 'x' });
+    const wide = toDrawio(layoutView(vm, 'fit'), vm, m.groups, { showStubs: false, title: 'x' });
     expect(wide).toMatch(new RegExp(`value="${LONG}" style="[^"]*fontSize=10;`));
   });
 });

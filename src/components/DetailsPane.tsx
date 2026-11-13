@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { autoSequence, chainLinks, chainSequence, linkLabel } from '../model/chainLinks';
-import { useStore } from '../model/store';
+import { canEdit, useStore } from '../model/store';
+import { ReadOnlyNote } from './Explorer';
 import { CommentsPanel } from './CommentsPanel';
 import {
   SIDES,
@@ -17,6 +18,7 @@ import {
 export function DetailsPane({ hidden }: { hidden?: boolean }) {
   const focus = useStore((s) => s.ui.focus);
   const setFocus = useStore((s) => s.setFocus);
+  const edit = useEdit();
   if (!focus) {
     return (
       <aside className="details" hidden={hidden}>
@@ -28,12 +30,30 @@ export function DetailsPane({ hidden }: { hidden?: boolean }) {
   return (
     <aside className="details" hidden={hidden}>
       <button className="close" onClick={() => setFocus(null)} title="Close">×</button>
+      {!edit && <ReadOnlyNote />}
       {focus.kind === 'centre' && <CentrePane />}
       {focus.kind === 'system' && <SystemPane id={focus.id} />}
       {focus.kind === 'topic' && <TopicPane id={focus.id} />}
       {focus.kind === 'group' && <GroupPane id={focus.id} />}
       {focus.kind === 'flow' && <FlowPane topicId={focus.topicId} fromId={focus.fromId} toId={focus.toId} />}
     </aside>
+  );
+}
+
+/** Dropdowns list their entries by name, in natural order ("TOPIC 2" before "TOPIC 10"), whatever the left panel order. */
+const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
+const byName = <T extends { name: string }>(items: T[]): T[] => [...items].sort((a, b) => collator.compare(a.name, b.name));
+
+/** Without a user name the right panel is read-only: fields show their values but cannot be changed. */
+const useEdit = () => useStore((s) => canEdit(s.ui));
+
+/** Disables every field and button inside while the diagram is read-only. */
+function Lock({ children }: { children: ReactNode }) {
+  const edit = useEdit();
+  return (
+    <fieldset className="lock" disabled={!edit}>
+      {children}
+    </fieldset>
   );
 }
 
@@ -59,6 +79,7 @@ function CentrePane() {
   return (
     <div>
       <h3 className="pane-kind">Central broker</h3>
+      <Lock>
       <Text label="Name" value={centre.name} onChange={(name) => update({ name })} />
       <Text label="Description" value={centre.description} onChange={(description) => update({ description })} multiline />
       <Select
@@ -71,6 +92,7 @@ function CentrePane() {
         onChange={(v) => update({ sos: v as 'inner' | 'none' })}
       />
       <Properties value={centre.properties} onChange={(properties) => update({ properties })} />
+      </Lock>
       <p className="muted small">
         {model.systems.length} systems · {model.topics.length} topics · {model.interactions.length} interactions
       </p>
@@ -108,13 +130,15 @@ function SystemPane({ id }: { id: string }) {
   const sys = model.systems.find((s) => s.id === id);
   if (!sys) return <p className="muted">This system no longer exists.</p>;
   const forbidden = new Set([id, ...descendants(model, id)]);
-  const parents = model.systems.filter((s) => !forbidden.has(s.id));
+  const parents = byName(model.systems.filter((s) => !forbidden.has(s.id)));
   const parentName = sys.parentId ? model.systems.find((s) => s.id === sys.parentId)?.name : model.centre.name;
   const mine = model.interactions.filter((i) => i.systemId === id);
+  const edit = canEdit(useStore.getState().ui);
 
   return (
     <div>
       <h3 className="pane-kind">{sys.kind === 'etl' ? 'ETL' : 'System'}</h3>
+      <Lock>
       <Text label="Name" value={sys.name} onChange={(name) => st().updateSystem(id, { name })} />
       <div className="row2">
         <Select label="Kind" value={sys.kind} options={[['system', 'System'], ['etl', 'ETL']]} onChange={(kind) => st().updateSystem(id, { kind: kind as 'system' | 'etl' })} />
@@ -149,10 +173,15 @@ function SystemPane({ id }: { id: string }) {
       <label className="check">
         <input type="checkbox" checked={sys.hidden} onChange={(e) => st().updateSystem(id, { hidden: e.target.checked })} /> Hidden (with its upstream systems)
       </label>
+      </Lock>
       <div className="btn-row">
         <button onClick={() => st().filterOn('system', id, false)}>Focus view</button>
-        <button onClick={() => st().addSystem({ kind: 'system', parentId: id })}>+ Upstream system</button>
-        <button onClick={() => st().addSystem({ kind: 'etl', parentId: id })}>+ Upstream ETL</button>
+        {edit && (
+          <>
+            <button onClick={() => st().addSystem({ kind: 'system', parentId: id })}>+ Upstream system</button>
+            <button onClick={() => st().addSystem({ kind: 'etl', parentId: id })}>+ Upstream ETL</button>
+          </>
+        )}
       </div>
 
       {(['produce', 'consume'] as Direction[]).map((dir) => (
@@ -166,12 +195,12 @@ function SystemPane({ id }: { id: string }) {
             .map((i) => (
               <InteractionTopic key={i.id} interaction={i} />
             ))}
-          <AddInteraction systemId={id} direction={dir} />
+          {edit && <AddInteraction systemId={id} direction={dir} />}
         </section>
       ))}
 
       <CommentsPanel target={{ kind: 'system', id }} />
-      <button className="danger" onClick={() => confirm(`Delete ${sys.name}?`) && st().deleteSystem(id)}>Delete system</button>
+      {edit && <button className="danger" onClick={() => confirm(`Delete ${sys.name}?`) && st().deleteSystem(id)}>Delete system</button>}
     </div>
   );
 }
@@ -179,6 +208,7 @@ function SystemPane({ id }: { id: string }) {
 function InteractionTopic({ interaction: i }: { interaction: Interaction }) {
   const topic = useStore((s) => s.model.topics.find((t) => t.id === i.topicId));
   const st = useStore.getState;
+  const edit = useEdit();
   if (!topic) return null;
   return (
     <details className={`topic-card${i.hidden ? ' is-hidden' : ''}`}>
@@ -188,11 +218,17 @@ function InteractionTopic({ interaction: i }: { interaction: Interaction }) {
           <ChainDots chainIds={i.chainIds} />
         </span>
         <span className="summary-actions" onClick={(e) => e.preventDefault()}>
-          <label title="Hide this interaction">
-            <input type="checkbox" checked={i.hidden} onChange={(e) => st().updateInteraction(i.id, { hidden: e.target.checked })} /> hide
-          </label>
+          {edit && (
+            <label title="Hide this interaction">
+              <input type="checkbox" checked={i.hidden} onChange={(e) => st().updateInteraction(i.id, { hidden: e.target.checked })} /> hide
+            </label>
+          )}
           <button className="link" onClick={() => st().setFocus({ kind: 'topic', id: topic.id })}>open</button>
-          <button className="link danger" onClick={() => st().deleteInteraction(i.id)} title="Remove interaction">remove</button>
+          {edit && (
+            <button className="link danger" onClick={() => st().deleteInteraction(i.id)} title="Remove interaction">
+              remove
+            </button>
+          )}
         </span>
       </summary>
       <div className="endpoint-fields">
@@ -204,9 +240,13 @@ function InteractionTopic({ interaction: i }: { interaction: Interaction }) {
 }
 
 function AddInteraction({ systemId, direction }: { systemId: string; direction: Direction }) {
-  const topics = useStore((s) => s.model.topics);
+  const allTopics = useStore((s) => s.model.topics);
+  const interactions = useStore((s) => s.model.interactions);
   const st = useStore.getState;
   const [value, setValue] = useState('');
+  // Only offer topics this system does not already produce (or consume).
+  const taken = new Set(interactions.filter((i) => i.systemId === systemId && i.direction === direction).map((i) => i.topicId));
+  const topics = byName(allTopics.filter((t) => !taken.has(t.id)));
   const [newName, setNewName] = useState('');
   const add = () => {
     let topicId = value;
@@ -240,6 +280,7 @@ function TopicPane({ id }: { id: string }) {
   const topic = model.topics.find((t) => t.id === id);
   const [sysId, setSysId] = useState('');
   const [dir, setDir] = useState<Direction>('consume');
+  const edit = useEdit();
   if (!topic) return <p className="muted">This topic no longer exists.</p>;
   const links = model.interactions.filter((i) => i.topicId === id);
   const sysName = (sid: string) => model.systems.find((s) => s.id === sid)?.name ?? sid;
@@ -260,18 +301,23 @@ function TopicPane({ id }: { id: string }) {
               <div key={i.id} className={`link-row${i.hidden ? ' is-hidden' : ''}`}>
                 <button className="link" onClick={() => st().setFocus({ kind: 'system', id: i.systemId })}>{sysName(i.systemId)}</button>
                 <ChainPicker interaction={i} compact />
-                <label title="Hide this interaction">
-                  <input type="checkbox" checked={i.hidden} onChange={(e) => st().updateInteraction(i.id, { hidden: e.target.checked })} /> hide
-                </label>
-                <button className="link danger" onClick={() => st().deleteInteraction(i.id)}>remove</button>
+                {edit && (
+                  <>
+                    <label title="Hide this interaction">
+                      <input type="checkbox" checked={i.hidden} onChange={(e) => st().updateInteraction(i.id, { hidden: e.target.checked })} /> hide
+                    </label>
+                    <button className="link danger" onClick={() => st().deleteInteraction(i.id)}>remove</button>
+                  </>
+                )}
               </div>
             ))}
         </section>
       ))}
+      {edit && (
       <div className="add-row">
         <select value={sysId} onChange={(e) => setSysId(e.target.value)}>
           <option value="">Add system…</option>
-          {model.systems.map((s) => (
+          {byName(model.systems).map((s) => (
             <option key={s.id} value={s.id}>{s.name}</option>
           ))}
         </select>
@@ -281,8 +327,9 @@ function TopicPane({ id }: { id: string }) {
         </select>
         <button disabled={!sysId} onClick={() => { st().addInteraction(sysId, id, dir); setSysId(''); }}>Add</button>
       </div>
+      )}
       <CommentsPanel target={{ kind: 'topic', id }} />
-      <button className="danger" onClick={() => confirm(`Delete ${topic.name}?`) && st().deleteTopic(id)}>Delete topic</button>
+      {edit && <button className="danger" onClick={() => confirm(`Delete ${topic.name}?`) && st().deleteTopic(id)}>Delete topic</button>}
     </div>
   );
 }
@@ -293,8 +340,9 @@ function TopicFields({ id }: { id: string }) {
   const st = useStore.getState;
   if (!topic) return null;
   const up = (patch: Parameters<ReturnType<typeof st>['updateTopic']>[1]) => st().updateTopic(id, patch);
-  const bundles: [string, string][] = [['', '— none —'], ...groups.filter((g) => g.type === 'bundle').map((g) => [g.id, g.name] as [string, string])];
+  const bundles: [string, string][] = [['', '— none —'], ...byName(groups.filter((g) => g.type === 'bundle')).map((g) => [g.id, g.name] as [string, string])];
   return (
+    <Lock>
     <div className="topic-fields">
       <Text label="Name" value={topic.name} onChange={(name) => up({ name })} />
       <div className="row2">
@@ -308,6 +356,7 @@ function TopicFields({ id }: { id: string }) {
         <input type="checkbox" checked={topic.hidden} onChange={(e) => up({ hidden: e.target.checked })} /> Hidden
       </label>
     </div>
+    </Lock>
   );
 }
 
@@ -317,6 +366,7 @@ function GroupPane({ id }: { id: string }) {
   const g = model.groups.find((x) => x.id === id);
   if (!g) return <p className="muted">This group no longer exists.</p>;
   const isBundle = g.type === 'bundle';
+  const edit = canEdit(useStore.getState().ui);
   return (
     <div>
       <h3 className="pane-kind">{isBundle ? 'Bundle' : 'Chain'}</h3>
@@ -325,6 +375,7 @@ function GroupPane({ id }: { id: string }) {
           ? 'A bundle groups whole topics, wherever they are produced or consumed.'
           : 'A chain groups individual endpoints: pick which systems producing or consuming a topic take part in it.'}
       </p>
+      <Lock>
       <div className="row2">
         <Text label="Name" value={g.name} onChange={(name) => st().updateGroup(id, { name })} />
         <label className="field">
@@ -337,13 +388,14 @@ function GroupPane({ id }: { id: string }) {
         <input type="checkbox" checked={g.hidden} onChange={(e) => st().updateGroup(id, { hidden: e.target.checked })} />
         Hide colouring ({isBundle ? 'no outline around its topics' : 'its endpoints and arrows go back to the default colour'})
       </label>
+      </Lock>
       <div className="btn-row">
         <button onClick={() => st().filterOn('topic', `grp:${id}`, false)}>Focus view</button>
       </div>
       {isBundle ? <BundleMembers groupId={id} /> : <ChainMembers groupId={id} />}
       {!isBundle && <SequenceEditor chainId={id} />}
       <CommentsPanel target={{ kind: 'group', id }} />
-      <button className="danger" onClick={() => confirm(`Delete ${g.name}?`) && st().deleteGroup(id)}>Delete group</button>
+      {edit && <button className="danger" onClick={() => confirm(`Delete ${g.name}?`) && st().deleteGroup(id)}>Delete group</button>}
     </div>
   );
 }
@@ -355,6 +407,7 @@ function BundleMembers({ groupId }: { groupId: string }) {
   return (
     <section className="subsection">
       <h4>Topics ({members.length})</h4>
+      <Lock>
       <div className="member-list">
         {model.topics.map((t) => (
           <label key={t.id} className="check">
@@ -368,6 +421,7 @@ function BundleMembers({ groupId }: { groupId: string }) {
           </label>
         ))}
       </div>
+      </Lock>
     </section>
   );
 }
@@ -388,6 +442,7 @@ function ChainMembers({ groupId }: { groupId: string }) {
         <input type="checkbox" checked={showAll} onChange={(e) => setShowAll(e.target.checked)} /> Show all topics to pick endpoints
       </label>
       {topics.length === 0 && <p className="muted small">No endpoints yet. Tick the box above, or add this chain to an endpoint from a system or topic pane.</p>}
+      <Lock>
       {topics.map((t) => {
         const eps = model.interactions.filter((i) => i.topicId === t.id);
         if (!eps.length) return null;
@@ -407,6 +462,7 @@ function ChainMembers({ groupId }: { groupId: string }) {
           </div>
         );
       })}
+      </Lock>
     </section>
   );
 }
@@ -433,6 +489,7 @@ function SequenceEditor({ chainId }: { chainId: string }) {
       </h4>
       <p className="muted small">Number the chain's links in the order data flows. A step can hold several links, and a link can appear in several steps.</p>
       {links.length === 0 && <p className="muted small">Add endpoints to this chain first: links appear when a producer and a consumer of the same topic are in the chain.</p>}
+      <Lock>
       {seq.map((step, i) => (
         <div key={i} className="seq-step">
           <div className="seq-head">
@@ -455,13 +512,18 @@ function SequenceEditor({ chainId }: { chainId: string }) {
             disabled={links.every((l) => step.includes(l.id))}
           >
             <option value="">+ add a link to step {i + 1}…</option>
-            {links.filter((l) => !step.includes(l.id)).map((l) => (
+            {links
+              .filter((l) => !step.includes(l.id))
+              .sort((a, b) => collator.compare(labelOf.get(a.id) ?? '', labelOf.get(b.id) ?? ''))
+              .map((l) => (
               <option key={l.id} value={l.id}>{labelOf.get(l.id)}</option>
             ))}
           </select>
         </div>
       ))}
+      </Lock>
       <div className="btn-row">
+        <Lock>
         <button disabled={!links.length} onClick={() => save([...seq, [links[0].id]])} title="Add a step (starts with the first link; change it in the step)">+ Step</button>
         <button
           disabled={!links.length}
@@ -471,6 +533,7 @@ function SequenceEditor({ chainId }: { chainId: string }) {
           Auto-fill
         </button>
         <button disabled={!seq.length} onClick={() => confirm('Clear the sequence?') && save([])}>Clear</button>
+        </Lock>
         <button
           className={animating ? 'on' : ''}
           disabled={!seq.length}
@@ -502,8 +565,9 @@ function ChainPicker({ interaction: i, label, compact }: { interaction: Interact
   const chains = groups.filter((g) => g.type === 'chain');
   const st = useStore.getState;
   const set = (chainIds: string[]) => st().updateInteraction(i.id, { chainIds });
-  const available = chains.filter((g) => !i.chainIds.includes(g.id));
+  const available = byName(chains.filter((g) => !i.chainIds.includes(g.id)));
   const body = (
+    <Lock>
     <span className={`chain-picker${compact ? ' compact' : ''}`}>
       {i.chainIds.map((c) => {
         const g = chains.find((x) => x.id === c);
@@ -525,6 +589,7 @@ function ChainPicker({ interaction: i, label, compact }: { interaction: Interact
       )}
       {!chains.length && <span className="muted small">No chains defined</span>}
     </span>
+    </Lock>
   );
   if (compact) return body;
   return (

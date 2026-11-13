@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Version | 0.24 |
+| Version | 0.25 |
 | Last updated | 2026-11-07 |
 | Reference material | [`images/`](images/) (hand-drawn target views), [`Topico.drawio`](Topico.drawio) (source sketch) |
 
@@ -83,18 +83,18 @@ The built-in sample model (toolbar button **Sample**) recreates ALL.png.
 | REN-04 | A system relays topics between its parent and its upstream nodes: what it consumes it passes on to its children, and what its children produce it receives. | Done (tested) | |
 | REN-05 | ETLs are visually distinct from systems. | Done | |
 | REN-06 | Hovering a topic highlights its arrows and dims all other arrows. | Done | |
-| REN-08 | The toolbar chooses how a topic name longer than its box is shown: rolling text, the full name in a smaller font, or wider boxes that fit the name. | Done (tested) | Default: rolling. Applies to the diagram tabs and the chain tube bars, and is remembered between sessions. Wider boxes give all the tabs of a system the length of its longest name, and systems and the broker grow to make room. In small font, names reduce down to 4 px at the smallest, and short names keep the normal size. SVG exports follow the choice. draw.io has no rolling text, so its exports show the full name at a size that fits. Checked in Chrome with real text widths. |
+| REN-08 | The canvas dock (*Topic names*) chooses how a topic name longer than its box is shown: rolling text, the full name in a smaller font, or wider boxes that fit the name. | Done (tested) | Default: rolling. Applies to the diagram tabs and the chain tube bars, and is remembered between sessions. Wider boxes give all the tabs of a system the length of its longest name, and systems and the broker grow to make room. In small font, names reduce down to 4 px at the smallest, and short names keep the normal size. SVG exports follow the choice. draw.io has no rolling text, so its exports show the full name at a size that fits. Checked in Chrome with real text widths. |
 
 ### 4.3 Selection and focused views
 
 | ID | Requirement | Status | Notes |
 |---|---|---|---|
 | SEL-01 | **Single system**: show only that system's topics, the broker, and its related upstream leaves and ETLs (SINGLE_SYS.png). | Done (tested) | The view includes ETLs attached to the broker that share a topic with the system. |
-| SEL-02 | **Several systems**: show only their topics and how they interact through the broker, plus their related upstream leaves and ETLs (MULTI_SYS.png). | Done (tested) | By default only topics shared by at least two of the selected systems are shown. A toolbar checkbox, *Shared only*, switches to all of their topics. If no topic is shared, all of their topics are shown. |
+| SEL-02 | **Several systems**: show only their topics and how they interact through the broker, plus their related upstream leaves and ETLs (MULTI_SYS.png). | Done (tested) | By default only topics shared by at least two of the selected systems are shown. *Shared only*, under *Settings* in the canvas dock, switches to all of their topics. If no topic is shared, all of their topics are shown. |
 | SEL-03 | **One or more topics**: show only the systems that relay them, the broker, and the related upstream leaves and ETLs (TOPICS.png). | Done (tested) | Parent systems are always kept so that upstream leaves stay connected. |
 | SEL-04 | **Clearing the filter or selecting the broker** shows everything (CENTRE.png). | Done (tested) | |
 | SEL-05 | A selection can be made on the canvas or in a selector panel. | Done | Canvas: double-click to focus, Shift/Cmd/Ctrl+double-click to add. Left panel: checkboxes. Filter bar: removable chips and a "Show all" link. |
-| SEL-06 | In a focused view, flows to or from systems outside the view are shown as dashed stub arrows. | Done (tested) | **Design decision**, based on the loose arrows in SINGLE_SYS.png. A toolbar checkbox, *Off-view flows*, turns them off. |
+| SEL-06 | In a focused view, flows to or from systems outside the view are shown as dashed stub arrows. | Done (tested) | **Design decision**, based on the loose arrows in SINGLE_SYS.png. *Off-view flows*, under *Settings* in the canvas dock, turns them off. |
 
 ### 4.4 Hiding
 
@@ -114,7 +114,7 @@ The built-in sample model (toolbar button **Sample**) recreates ALL.png.
 | GRP-02a | An endpoint can be part of more than one chain. | Done (tested) | An endpoint can be in a chain while its topic is also in a bundle. |
 | GRP-03 | Chain membership can be edited from the system pane, the topic pane, and the chain's own pane. | Done | System and topic panes: on each endpoint, the chains it is in are shown as removable chips, with a "+" picker to add more. Chain pane: endpoints listed by topic, with checkboxes and an "also in …" note. Checked in Chrome. |
 | GRP-04 | Group membership is visible on the diagram. | Done | Bundles are drawn as a coloured outline around adjacent tabs. A chain colours the tabs of its endpoints, and colours an arrow only for the chains that both of its ends share, so each chain's path is visible. An endpoint in several chains has a tab striped in each chain's colour. An arrow shared by several chains alternates dashes in each colour. The draw.io export uses the first chain's colour for arrows. A legend is shown on the canvas. |
-| GRP-05 | The view can collapse each bundle, or each chain, into a single tab per system. | Done (tested) | Toolbar menu *Group topics*. Collapsing by chain merges only the chain's endpoints. An endpoint in several chains appears in each of its chain tabs, and arrows link the tabs of the chains both ends share. Flows that leave the chain stay connected to the plain topic tabs. |
+| GRP-05 | The view can collapse each bundle, or each chain, into a single tab per system. | Done (tested) | Canvas dock menu *Group topics*. Collapsing by chain merges only the chain's endpoints. An endpoint in several chains appears in each of its chain tabs, and arrows link the tabs of the chains both ends share. Flows that leave the chain stay connected to the plain topic tabs. |
 | GRP-06 | The user can focus the view on a whole group. | Done (tested) | Left panel checkbox on the group, or "Focus view" in the group pane. Focusing a bundle shows every endpoint of its topics. Focusing a chain shows only the chain's endpoints, with dashed stubs for the topics' other flows. |
 | GRP-08 | A **View** button on each chain in the left panel switches the canvas to a chain view, and switches back when clicked again (CHAIN.png). | Done | The filter bar shows "Chain view: <name>" with a "Back to Topics" link. Deleting the chain closes the view. |
 | GRP-09 | In the chain view, the broker is drawn as a horizontal tube, and each topic of the chain is a bar inside it. Only the chain's endpoints are shown. | Done (tested) | Bars span from the leftmost to the rightmost system they connect, reaching the tube's end for West/East systems. Overlapping bars are packed into separate lanes. Hidden systems, topics and interactions are left out. |
@@ -200,15 +200,17 @@ The built-in sample model (toolbar button **Sample**) recreates ALL.png.
 | COM-06 | An item with unresolved comments shows a small numbered circle in its corner, or on its line, giving the number of open threads. | Done | On systems, the broker, topic tabs (every tab of the topic), collapsed group tabs and lines, in the Topics, chain and SoS views. A thread counts until it is closed. Checked in Chrome. |
 | COM-07 | Clicking a circle opens the right panel on the item and brings its comment into view. | Done | The panel reopens if it was collapsed, scrolls to the thread and highlights it. Checked in Chrome. |
 | COM-08 | Comment threads are stored compressed in the exported JSON, and are not part of SVG or draw.io exports. | Done (tested) | `"comments": {"encoding": "gzip+base64", "data": "…"}`, using the fflate library. Files with a plain list of threads also load. The circles and comments exist only on screen. |
+| COM-09 | Changing the diagram needs a user name. Without one, the left panel cannot add, move, reorder, rename, duplicate or delete anything, the right panel shows every field read-only, and systems cannot be dragged on the canvas. | Done (tested) | Enforced in the store, so no screen can bypass it. Still open to everyone: browsing, search, filters, folding, the ● / ◌ show/hide, views and animation, Open / New / Sample, and the System of System display options. A note at the top of each panel links to the name form. The name is not a login: anyone can type one. |
 ### 4.11 Export and persistence
 
 | ID | Requirement | Status | Notes |
 |---|---|---|---|
 | EXP-01 | Any view can be exported as SVG. | Done | Exports exactly what is on screen, including the current filter. Checked by rendering sample views to PNG. |
-| EXP-02 | Any view can be exported in a format draw.io can open. | Done | `.drawio` (mxGraph XML). The XML was checked to be well formed. **Not yet opened in draw.io.** Optional hand-drawn sketch style. |
+| EXP-02 | Any view can be exported in a format draw.io can open. | Done | `.drawio` (mxGraph XML). The XML was checked to be well formed. **Not yet opened in draw.io.** The hand-drawn sketch style is left to draw.io itself (Format panel → Sketch); the export option was removed in 0.25. |
 | EXP-03 | The model is saved automatically. | Done | Browser localStorage. |
 | EXP-04 | The model can be saved to and loaded from a file. | Done | JSON. Missing fields are filled with defaults on load. |
 | EXP-05 | An existing `.drawio` file can be imported. | **Open** | Not requested. Listed only to track the idea. |
+| EXP-06 | The current file can be saved over, or saved to a new file. | Done | **Save** writes over the file last opened or saved (asks where the first time); **Save as…** asks where, and that file becomes the current one. Chrome and Edge (File System Access API). Other browsers show a single **Save JSON** download. New and Sample forget the current file. |
 
 ---
 
@@ -228,14 +230,15 @@ The built-in sample model (toolbar button **Sample**) recreates ALL.png.
 
 ```
 ┌──────────────────────────────── Toolbar ────────────────────────────────┐
-│ New · Sample · Open · Save JSON │ Group topics · Shared only · Off-view │ Export SVG · draw.io │
+│ New · Sample · Open · Save · Save as │ Topics · SoS │ Export SVG · draw.io │ User │
 ├──────────────┬─────────────────────────────────────────┬────────────────┤
 │ Explorer     │ Filter bar (chips / Show all)           │ Details pane   │
 │  search      │                                         │  centre /      │
 │  systems by  │            Canvas                       │  system /      │
 │  border      │   (scroll = zoom, drag = pan)           │  topic /       │
 │  topics      │                                         │  group         │
-│  bundles     │ Legend                     Fit + −      │                │
+│  bundles     │ Legend   Topic names · Group topics ·   │
+│              │          Settings · Fit + −             │                │
 │  chains      │                                         │                │
 └──────────────┴─────────────────────────────────────────┴────────────────┘
 ```
@@ -281,6 +284,7 @@ The original request did not settle these points. They were decided during the i
 | Date | Version | Change |
 |---|---|---|
 | 2026-11-07 | 0.1 | Initial build covering §4.1–4.6, §4.8 and §4.11. Reference material moved to `docs/spec/`. |
+| 2026-11-13 | 0.25 | Editing needs a user name (COM-09). Save / Save as over the current file (EXP-06). View options moved to a dock at the bottom of the canvas, which can be folded. The draw.io sketch-style option is removed (EXP-02). |
 | 2026-11-11 | 0.24 | Comments on every entity and line (COM-01 to COM-08). The legend lists only chains. |
 | 2026-11-11 | 0.23 | The main view is called **Topics** in the toolbar switch (Topics / System of System) and its "Back to" links. |
 | 2026-11-11 | 0.22 | Bundles and chains can be rearranged by drag and drop (EXL-16). |

@@ -48,7 +48,6 @@ describe('chain animation', () => {
   it('exports one draw.io page per step plus an overview, with flow animation on the current step', () => {
     const { m, vm, anim } = setup();
     const xml = toDrawio(layoutView(vm), vm, m.groups, {
-      sketch: false,
       showStubs: false,
       title: 'x',
       anim: { chainName: anim.chainName, color: anim.color, count: anim.count, stepLabels: anim.stepLabels, steps: anim.edgeSteps },
@@ -58,7 +57,6 @@ describe('chain animation', () => {
     expect(xml).toContain('name="Billing — step 3"');
     expect(xml.match(/flowAnimation=1/g)!.length).toBeGreaterThanOrEqual(4); // 2 + 1 + 1 current arrows over the 3 steps
     const tube = toChainDrawio(computeChainLayout(m, 'c-billing')!, {
-      sketch: false,
       anim: { chainName: anim.chainName, color: anim.color, count: anim.count, stepLabels: anim.stepLabels, steps: anim.arrowSteps },
     });
     expect(tube.match(/<diagram /g)).toHaveLength(4);
@@ -68,7 +66,7 @@ describe('chain animation', () => {
   it('exports a single page without animation, and an animated SVG of the current step', () => {
     const { m, vm, anim } = setup(2);
     const l = layoutView(vm);
-    expect(toDrawio(l, vm, m.groups, { sketch: false, showStubs: false, title: 'x' }).match(/<diagram /g)).toHaveLength(1);
+    expect(toDrawio(l, vm, m.groups, { showStubs: false, title: 'x' }).match(/<diagram /g)).toHaveLength(1);
     const svg = toSvg(l, vm, m.groups, false, { edgeSteps: anim.edgeSteps, current: anim.current, color: anim.color });
     expect(svg).toContain('stroke-dashoffset');
   });

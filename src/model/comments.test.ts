@@ -102,7 +102,7 @@ describe('comments are not exported to SVG or draw.io', () => {
     createThread(m.comments, { kind: 'system', id: 'n1' }, 'SECRET-REMARK', ann);
     const vm = computeView(m, { filterSystems: [], filterTopics: [], collapseBy: 'none', sharedOnly: true });
     const l = layoutView(vm);
-    for (const out of [toSvg(l, vm, m.groups, false), toDrawio(l, vm, m.groups, { sketch: false, showStubs: false, title: 'x' })]) {
+    for (const out of [toSvg(l, vm, m.groups, false), toDrawio(l, vm, m.groups, { showStubs: false, title: 'x' })]) {
       expect(out).not.toContain('SECRET-REMARK');
       expect(out).not.toContain('data-badge');
       expect(out).not.toContain('#ea580c');

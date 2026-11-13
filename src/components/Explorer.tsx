@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type DragEvent, type MouseEvent, type ReactNode } from 'react';
 import { groupTopicId } from '../engine/view';
 import { canMoveSystem, nameOrderState, type MoveTarget, type SortDir } from '../model/ops';
-import { useStore } from '../model/store';
+import { canEdit, useStore } from '../model/store';
 import { SIDES, SIDE_LABEL, SOS_ROLE_LABEL, effectiveSide, type Side, type SosRole, type SystemNode } from '../model/types';
 
 type ItemRef = { kind: 'centre' } | { kind: 'system' | 'topic' | 'group'; id: string };
@@ -20,6 +20,8 @@ export function Explorer({ hidden }: { hidden?: boolean }) {
   const model = useStore((s) => s.model);
   const ui = useStore((s) => s.ui);
   const st = useStore.getState;
+  // Without a user name the diagram is read-only: nothing can be added, moved, renamed or deleted.
+  const edit = canEdit(ui);
   const [query, setQuery] = useState('');
   const [menu, setMenu] = useState<MenuState | null>(null);
   const [renaming, setRenaming] = useState<string | null>(null);
@@ -66,8 +68,8 @@ export function Explorer({ hidden }: { hidden?: boolean }) {
     else st().updateGroup(item.id, { name: v });
   };
   const renameProps = (item: ItemRef) => ({
-    editing: renaming === itemKey(item),
-    onStartRename: () => setRenaming(itemKey(item)),
+    editing: edit && renaming === itemKey(item),
+    onStartRename: () => edit && setRenaming(itemKey(item)),
     onRename: (name: string) => rename(item, name),
     onCancelRename: () => setRenaming(null),
     onContextMenu: openMenu(item),
@@ -95,7 +97,7 @@ export function Explorer({ hidden }: { hidden?: boolean }) {
     return f < 0.3 ? 'before' : f > 0.7 ? 'after' : 'inside';
   };
   const systemDnd = (s: SystemNode) => ({
-    draggable: true,
+    draggable: edit,
     onDragStart: (e: DragEvent) => {
       e.dataTransfer.setData('text/plain', s.name);
       e.dataTransfer.effectAllowed = 'move';
@@ -130,7 +132,7 @@ export function Explorer({ hidden }: { hidden?: boolean }) {
           onToggleHidden={() => st().updateSystem(s.id, { hidden: !s.hidden })}
           {...renameProps({ kind: 'system', id: s.id })}
           {...systemDnd(s)}
-          extra={sosMode && <SosRoleButton role={s.sos} onChange={(sos) => st().updateSystem(s.id, { sos })} />}
+          extra={sosMode && <SosRoleButton disabled={!edit} role={s.sos} onChange={(sos) => st().updateSystem(s.id, { sos })} />}
           fold={children.length ? { open: !closed, onToggle: () => toggleFold(s.id), hiddenCount: countUnder(s.id) } : null}
         />
         {!closed && childRows}
@@ -145,7 +147,7 @@ export function Explorer({ hidden }: { hidden?: boolean }) {
       return e.clientY - r.top < r.height / 2 ? 'before' : 'after';
     };
     return {
-      draggable: true,
+      draggable: edit,
       onDragStart: (e: DragEvent) => {
         e.dataTransfer.setData('text/plain', id);
         e.dataTransfer.effectAllowed = 'move';
@@ -178,7 +180,7 @@ export function Explorer({ hidden }: { hidden?: boolean }) {
     };
     const sameKind = () => drag?.kind === 'group' && drag.id !== id && model.groups.find((g) => g.id === drag.id)?.type === type;
     return {
-      draggable: true,
+      draggable: edit,
       onDragStart: (e: DragEvent) => {
         e.dataTransfer.setData('text/plain', id);
         e.dataTransfer.effectAllowed = 'move';
@@ -204,14 +206,18 @@ export function Explorer({ hidden }: { hidden?: boolean }) {
   return (
     <aside className="explorer" hidden={hidden}>
       <input className="search" placeholder="Search…" value={query} onChange={(e) => setQuery(e.target.value)} />
+      {!edit && <ReadOnlyNote />}
 
       <Section
+        searching={!!q}
         title="Systems"
         actions={
-          <>
-            <button onClick={() => st().addSystem({ kind: 'system' })}>+ System</button>
-            <button onClick={() => st().addSystem({ kind: 'etl' })}>+ ETL</button>
-          </>
+          edit && (
+            <>
+              <button onClick={() => st().addSystem({ kind: 'system' })}>+ System</button>
+              <button onClick={() => st().addSystem({ kind: 'etl' })}>+ ETL</button>
+            </>
+          )
         }
       >
         <Row
@@ -226,7 +232,7 @@ export function Explorer({ hidden }: { hidden?: boolean }) {
           {...renameProps({ kind: 'centre' })}
           extra={
             sosMode && (
-              <SosRoleButton role={model.centre.sos} allowOuter={false} onChange={(sos) => st().updateCentre({ sos: sos as 'inner' | 'none' })} />
+              <SosRoleButton disabled={!edit} role={model.centre.sos} allowOuter={false} onChange={(sos) => st().updateCentre({ sos: sos as 'inner' | 'none' })} />
             )
           }
         />
@@ -254,15 +260,17 @@ export function Explorer({ hidden }: { hidden?: boolean }) {
                   {closed && count > 0 && <span className="fold-count">{count}</span>}
                 </button>
                 <span className="side-actions">
-                  <button
-                    onClick={() => {
-                      unfold(sideKey);
-                      st().addSystem({ kind: 'system', side });
-                    }}
-                    title={`Add a system on the ${SIDE_LABEL[side]} border`}
-                  >
-                    +
-                  </button>
+                  {edit && (
+                    <button
+                      onClick={() => {
+                        unfold(sideKey);
+                        st().addSystem({ kind: 'system', side });
+                      }}
+                      title={`Add a system on the ${SIDE_LABEL[side]} border`}
+                    >
+                      +
+                    </button>
+                  )}
                   <button onClick={() => foldAll(side)} disabled={!parents.length || parents.every((id) => folded.has(id))} title="Fold all: show only the systems on the broker">
                     ⊟
                   </button>
@@ -278,12 +286,15 @@ export function Explorer({ hidden }: { hidden?: boolean }) {
       </Section>
 
       <Section
+        searching={!!q}
         title="Topics"
         actions={
-          <>
-            <SortButton items={model.topics} what="topics" onSort={(dir) => st().sortTopics(dir)} />
-            <button onClick={() => st().setFocus({ kind: 'topic', id: st().addTopic() })}>+ Topic</button>
-          </>
+          edit && (
+            <>
+              <button onClick={() => st().setFocus({ kind: 'topic', id: st().addTopic() })}>+ Topic</button>
+              <SortButton items={model.topics} what="topics" onSort={(dir) => st().sortTopics(dir)} />
+            </>
+          )
         }
       >
         {model.topics
@@ -308,13 +319,16 @@ export function Explorer({ hidden }: { hidden?: boolean }) {
 
       {(['bundle', 'chain'] as const).map((type) => (
         <Section
+        searching={!!q}
           key={type}
           title={type === 'bundle' ? 'Bundles' : 'Chains'}
           actions={
-            <>
-              <SortButton items={groupsOf(type)} what={type === 'bundle' ? 'bundles' : 'chains'} onSort={(dir) => st().sortGroups(type, dir)} />
-              <button onClick={() => st().addGroup(type)}>+ {type === 'bundle' ? 'Bundle' : 'Chain'}</button>
-            </>
+            edit && (
+              <>
+                <button onClick={() => st().addGroup(type)}>+ {type === 'bundle' ? 'Bundle' : 'Chain'}</button>
+                <SortButton items={groupsOf(type)} what={type === 'bundle' ? 'bundles' : 'chains'} onSort={(dir) => st().sortGroups(type, dir)} />
+              </>
+            )
           }
         >
           {groupsOf(type)
@@ -385,6 +399,8 @@ function ContextMenu({ menu, onClose, onRename, onAddUnder }: { menu: MenuState;
   const ref = useRef<HTMLDivElement>(null);
   const st = useStore.getState;
   const model = useStore((s) => s.model);
+  const edit = useStore((s) => canEdit(s.ui));
+  const setUi = useStore((s) => s.setUi);
   useEffect(() => {
     const close = (e: Event) => {
       if (e instanceof KeyboardEvent && e.key !== 'Escape') return;
@@ -457,6 +473,12 @@ function ContextMenu({ menu, onClose, onRename, onAddUnder }: { menu: MenuState;
   return (
     <div className="context-menu" ref={ref} style={{ left: x, top: y }} onContextMenu={(e) => e.preventDefault()}>
       <div className="cm-title">{name}</div>
+      {!edit && (
+        <button className="cm-note" onClick={run(() => setUi({ userMenuOpen: true }))}>
+          Read-only: set your name to edit
+        </button>
+      )}
+      <fieldset className="lock" disabled={!edit}>
       <button onClick={run(onRename)}>Rename<span className="cm-hint">double-click</span></button>
       <button onClick={run(duplicate)} disabled={isCentre} title={isCentre ? 'There is only one broker' : undefined}>Duplicate</button>
       <button className="danger" onClick={run(remove)} disabled={isCentre} title={isCentre ? 'The broker cannot be deleted' : undefined}>Delete</button>
@@ -480,6 +502,7 @@ function ContextMenu({ menu, onClose, onRename, onAddUnder }: { menu: MenuState;
             ))}
         </>
       )}
+      </fieldset>
     </div>
   );
 }
@@ -505,26 +528,45 @@ function SortButton({ items, what, onSort }: { items: { name: string }[]; what: 
 const ROLE_SHORT: Record<SosRole, string> = { inner: 'Inner', outer: 'Outer', none: '—' };
 
 /** Cycles a system's SoS role: Inner → Outer → Not shown (the broker: Inner ↔ Not shown). */
-function SosRoleButton({ role, onChange, allowOuter = true }: { role: SosRole; onChange(r: SosRole): void; allowOuter?: boolean }) {
+function SosRoleButton({ role, onChange, allowOuter = true, disabled }: { role: SosRole; onChange(r: SosRole): void; allowOuter?: boolean; disabled?: boolean }) {
   const order: SosRole[] = allowOuter ? ['inner', 'outer', 'none'] : ['inner', 'none'];
   const next = order[(order.indexOf(role) + 1) % order.length];
   return (
     <button
       className={`sos-role sos-${role}`}
+      disabled={disabled}
       onClick={() => onChange(next)}
-      title={`System of System: ${SOS_ROLE_LABEL[role]}. Click for ${SOS_ROLE_LABEL[next]}.`}
+      title={disabled ? `System of System: ${SOS_ROLE_LABEL[role]}.` : `System of System: ${SOS_ROLE_LABEL[role]}. Click for ${SOS_ROLE_LABEL[next]}.`}
     >
       {ROLE_SHORT[role]}
     </button>
   );
 }
 
-function Section(p: { title: string; actions?: ReactNode; children: ReactNode }) {
-  const [open, setOpen] = useState(true);
+/** Shown at the top of a panel while the diagram is read-only (no user name yet). */
+export function ReadOnlyNote() {
+  const setUi = useStore((s) => s.setUi);
+  return (
+    <div className="readonly-note">
+      Read-only.{' '}
+      <button className="link" onClick={() => setUi({ userMenuOpen: true })}>
+        Set your name
+      </button>{' '}
+      to edit.
+    </div>
+  );
+}
+
+/** A left panel section: folded by default; the ones the user opens are remembered. While searching, all are open. */
+function Section(p: { title: string; actions?: ReactNode; children: ReactNode; searching?: boolean }) {
+  const openSections = useStore((s) => s.ui.openSections);
+  const setUi = useStore((s) => s.setUi);
+  const open = p.searching || openSections.includes(p.title);
+  const setOpen = (v: boolean) => setUi({ openSections: v ? [...openSections, p.title] : openSections.filter((t) => t !== p.title) });
   return (
     <section className="ex-section">
       <header>
-        <button className="ex-title" onClick={() => setOpen(!open)}>
+        <button className="ex-title" onClick={() => setOpen(!open)} disabled={p.searching} aria-expanded={open}>
           {open ? '▾' : '▸'} {p.title}
         </button>
         <span className="ex-actions">{p.actions}</span>
