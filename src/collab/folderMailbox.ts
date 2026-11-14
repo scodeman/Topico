@@ -50,6 +50,42 @@ export interface SignalNote {
 
 export const MAILBOX = '.topico-collab';
 
+/** A peer silent for longer than this has left (its tab closed without removing its note). */
+export const GONE_MS = 30000;
+
+/** This browser (profile): kept in its storage, so a normal and a private window are two different browsers. */
+export const BROWSER = (() => {
+  try {
+    const id = localStorage.getItem('topico-browser') ?? crypto.randomUUID().slice(0, 8);
+    localStorage.setItem('topico-browser', id);
+    return id;
+  } catch {
+    return crypto.randomUUID().slice(0, 8);
+  }
+})();
+
+/** Who is in the room now, read from the folder before joining it (no session needed). Notes this browser left
+    behind when a tab reloaded are not counted once silent for a few seconds. */
+export async function roomOccupants(root: DirHandle, now = Date.now()): Promise<PeerNote[]> {
+  let box: DirHandle;
+  try {
+    box = await root.getDirectoryHandle(MAILBOX);
+  } catch {
+    return [];
+  }
+  const notes: PeerNote[] = [];
+  for await (const [name, h] of box.entries()) {
+    if (h.kind !== 'file' || !/^peer\.[\w-]+\.json$/.test(name)) continue;
+    try {
+      const p = JSON.parse(await (await (h as unknown as FileHandleLike).getFile()).text()) as PeerNote;
+      if (p?.id) notes.push(p);
+    } catch {
+      /* being written: skip */
+    }
+  }
+  return notes.filter((p) => now - p.at < GONE_MS && !(p.browser === BROWSER && now - p.at > LEFTOVER_MS) && !replaced(p, notes, now));
+}
+
 export class FolderMailbox {
   private constructor(private dir: DirHandle) {}
 

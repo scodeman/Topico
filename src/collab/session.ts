@@ -1,6 +1,7 @@
+import { setCurrentFile } from '../model/currentFile';
 import { EMPTY_STATE, SharedDiagram } from './sharedDiagram';
 import { note, setState, useCollab, type PeerView, type ReplaceRequest } from './state';
-import { answerFile, replaced, FolderMailbox, offerFile, peerFile, type DirHandle, type PeerNote, type SignalNote } from './folderMailbox';
+import { answerFile, replaced, BROWSER, GONE_MS, FolderMailbox, offerFile, peerFile, type DirHandle, type PeerNote, type SignalNote } from './folderMailbox';
 
 /* Experiment: find the other Topico tabs using the same shared folder and connect to each one browser to browser
    (WebRTC data channel), with the folder as the only go-between. The channel then carries the diagram (Yjs updates,
@@ -15,7 +16,6 @@ import { answerFile, replaced, FolderMailbox, offerFile, peerFile, type DirHandl
 /** How often the folder is read, our heartbeat rewritten, and when a silent peer is considered gone. */
 const POLL_MS = 2000;
 const HEARTBEAT_MS = 5000;
-const GONE_MS = 30000;
 /** An unanswered offer is withdrawn and made again after this long (sync tools can take a while). */
 const OFFER_TIMEOUT_MS = 60000;
 /** Wait after a failed or closed connection before trying again. */
@@ -30,16 +30,7 @@ export type AskResult = { ok: true } | { ok: false; reason: string };
 const RTC_CONFIG: RTCConfiguration = { iceServers: [] };
 
 
-/** This browser (profile): kept in its storage, so a normal and a private window are two different browsers. */
-const BROWSER = (() => {
-  try {
-    const id = localStorage.getItem('topico-browser') ?? crypto.randomUUID().slice(0, 8);
-    localStorage.setItem('topico-browser', id);
-    return id;
-  } catch {
-    return crypto.randomUUID().slice(0, 8);
-  }
-})();
+
 
 /** Binary messages on the data channel: Yjs sync, and pieces of a message too big to send at once. */
 const STEP1 = 0; // state vector: "send me what I am missing"
@@ -267,6 +258,10 @@ class Session {
       else if (m.t === 'replace-ask' && m.reqId)
         setState((s) => ({ incoming: [...s.incoming, { reqId: m.reqId!, peerId: p.id, from: m.name ?? p.name, what: m.what ?? 'another diagram' }] }));
       else if (m.t === 'replace-cancel') setState((s) => ({ incoming: s.incoming.filter((r) => r.reqId !== m.reqId) }));
+      else if (m.t === 'replace-done') {
+        setCurrentFile(null);
+        note(`${p.name} replaced the diagram with ${m.what ?? 'another diagram'}`);
+      }
       else if (m.t === 'replace-answer' && m.reqId) this.onAnswer(p, m.reqId, !!m.ok);
       else if (m.t === 'ping') ch.send(JSON.stringify({ t: 'pong', ts: m.ts }));
       else if (m.t === 'pong' && m.ts !== undefined) {
@@ -292,6 +287,7 @@ class Session {
     const reqId = crypto.randomUUID();
     const names = useCollab.getState().peers;
     const waiting = new Map(open.map(([id]) => [id, names[id]?.name ?? 'someone']));
+    const asked = [...waiting.keys()];
     for (const [, l] of open) l.channel!.send(JSON.stringify({ t: 'replace-ask', reqId, name: this.name(), what }));
     note(`Asked ${[...waiting.values()].join(', ')} to replace the diagram with ${what}`);
     const show = () => setState({ asking: { reqId, what, waiting: [...waiting.values()] } });
@@ -305,6 +301,8 @@ class Session {
         setState({ asking: null, askResult: { what, ok: r.ok, reason: r.ok ? undefined : r.reason } });
         setTimeout(() => setState((s) => (s.askResult?.what === what ? { askResult: null } : {})), RESULT_SHOWN_MS);
         if (!r.ok) for (const [id] of waiting) this.send(id, { t: 'replace-cancel', reqId });
+        // The others' diagram is about to become ours: their current file no longer matches it.
+        else for (const id of asked) this.send(id, { t: 'replace-done', reqId, what });
         note(r.ok ? `Everyone agreed: replacing the diagram with ${what}` : `Diagram not replaced: ${r.reason}`);
         resolve(r);
       };
@@ -401,7 +399,7 @@ export const stopCollab = (): Promise<void> => serial(stop);
 
 async function start(root: DirHandle, name: () => string): Promise<void> {
   await stop();
-  setState({ status: 'starting', folder: root.name, error: undefined, peers: {}, log: [], shared: false });
+  setState({ status: 'starting', folder: root.name, folderHandle: root, error: undefined, peers: {}, log: [], shared: false });
   try {
     if ((await root.requestPermission?.({ mode: 'readwrite' })) === 'denied') throw new Error('No permission to write in this folder');
     session = new Session(await FolderMailbox.open(root), useCollab.getState().me, name);
@@ -423,7 +421,7 @@ async function stop(): Promise<void> {
   const s = session;
   session = null;
   if (s) await s.stop();
-  setState({ status: 'off', peers: {}, shared: false, asking: null, incoming: [] });
+  setState({ status: 'off', folderHandle: null, peers: {}, shared: false, asking: null, incoming: [] });
 }
 
 // Leave the folder when the tab closes (best effort: the heartbeat going stale covers the rest).

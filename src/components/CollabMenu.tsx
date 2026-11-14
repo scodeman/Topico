@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import type { DirHandle } from '../collab/folderMailbox';
+import { roomOccupants, type DirHandle } from '../collab/folderMailbox';
 import { useCollab, type PeerView, type ReplaceRequest } from '../collab/state';
 
 // The connection code and Yjs are loaded on first use.
@@ -62,7 +62,7 @@ function ReplaceDialogs() {
     </>
   );
 }
-import { loadHandle, storeHandle } from '../model/currentFile';
+import { loadHandle, setCurrentFile, storeHandle, useCurrentFile, type FileHandle } from '../model/currentFile';
 import { canEdit, useStore } from '../model/store';
 
 /* Experiment: meet other Topico users through a shared folder (see collab/session.ts). Chrome and Edge only. */
@@ -70,6 +70,23 @@ import { canEdit, useStore } from '../model/store';
 type DirPicker = (o: { id?: string; mode: 'readwrite' }) => Promise<DirHandle>;
 const pickDir = (window as unknown as { showDirectoryPicker?: DirPicker }).showDirectoryPicker?.bind(window);
 const FOLDER_KEY = 'collab-folder';
+
+interface DiagramFile {
+  name: string;
+  handle: FileHandle;
+  modified: number;
+}
+
+/** The diagram files (.json) at the top of a folder, newest first. */
+async function diagramFiles(dir: DirHandle): Promise<DiagramFile[]> {
+  const out: DiagramFile[] = [];
+  for await (const [name, h] of dir.entries()) {
+    if (h.kind !== 'file' || !name.toLowerCase().endsWith('.json')) continue;
+    const handle = h as unknown as FileHandle;
+    out.push({ name, handle, modified: (await handle.getFile()).lastModified });
+  }
+  return out.sort((a, b) => b.modified - a.modified);
+}
 let autoRejoinDone = false;
 /** This tab is in a session (kept in the tab's own storage, so it survives a refresh of that tab only). */
 const ACTIVE_KEY = 'topico-collab-active';
@@ -110,6 +127,7 @@ export function CollabMenu() {
   // After a refresh, a tab that was in a session joins it again: at once when the browser still lets it write in the
   // folder, otherwise the Collaborate button asks for one click (Chrome needs a click to grant that permission again).
   const [resume, setResume] = useState(false);
+  const [pending, setPending] = useState<{ dir: DirHandle; files: DiagramFile[]; choice: string } | null>(null);
   useEffect(() => {
     void loadHandle<DirHandle>(FOLDER_KEY).then(async (h) => {
       if (!h) return;
@@ -144,12 +162,34 @@ export function CollabMenu() {
     void storeHandle(FOLDER_KEY, dir);
     void startCollab(dir, () => useStore.getState().ui.userName);
   };
+  // After choosing the folder: pick the diagram file to work on among those in it (or keep the current diagram).
   const choose = async () => {
     try {
-      join(await pickDir({ id: 'topico-collab', mode: 'readwrite' }));
+      const dir = await pickDir({ id: 'topico-collab', mode: 'readwrite' });
+      // Someone is already in the room: join it and get the diagram they are editing (no file to choose).
+      if ((await roomOccupants(dir)).length) return join(dir);
+      const files = await diagramFiles(dir);
+      if (!files.length) return join(dir);
+      const current = useCurrentFile.getState().handle?.name;
+      const choice = files.some((f) => f.name === current) ? current! : files.length === 1 ? files[0].name : '';
+      setPending({ dir, files, choice });
     } catch (e) {
       if ((e as Error).name !== 'AbortError') alert(`Could not use this folder: ${(e as Error).message}`);
     }
+  };
+  const joinWithChoice = async () => {
+    if (!pending) return;
+    const f = pending.files.find((x) => x.name === pending.choice);
+    if (f) {
+      try {
+        useStore.getState().setModel(JSON.parse(await (await f.handle.getFile()).text()));
+        setCurrentFile(f.handle);
+      } catch (e) {
+        return alert(`Could not read ${f.name}: ${(e as Error).message}`);
+      }
+    }
+    setPending(null);
+    join(pending.dir);
   };
 
   return (
@@ -231,6 +271,36 @@ export function CollabMenu() {
                   ))}
                 </ul>
               </details>
+            </>
+          ) : pending ? (
+            <>
+              <p className="small">
+                Diagram to work on in <b>{pending.dir.name}</b>:
+              </p>
+              <div className="collab-files" role="radiogroup" aria-label="Diagram to work on">
+                {pending.files.map((f) => (
+                  <label key={f.name} className="check">
+                    <input type="radio" name="collab-file" checked={pending.choice === f.name} onChange={() => setPending({ ...pending, choice: f.name })} />
+                    <span className="collab-file-name">{f.name}</span>
+                    <span className="muted small">{new Date(f.modified).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}</span>
+                  </label>
+                ))}
+                <label className="check">
+                  <input type="radio" name="collab-file" checked={pending.choice === ''} onChange={() => setPending({ ...pending, choice: '' })} />
+                  <span className="collab-file-name">Keep my current diagram</span>
+                </label>
+              </div>
+              <p className="muted small">
+                Nobody is in this room yet: the file you pick is loaded, becomes your current file (<b>Save</b> writes back to it in this folder) and is the diagram others get when they join.
+              </p>
+              <div className="btn-row">
+                <button className="primary" onClick={() => void joinWithChoice()}>
+                  Join
+                </button>
+                <button className="link" onClick={() => setPending(null)}>
+                  Cancel
+                </button>
+              </div>
             </>
           ) : (
             <>

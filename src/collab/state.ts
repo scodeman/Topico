@@ -15,6 +15,8 @@ export interface PeerView {
 }
 export interface CollabState {
   folder: string | null;
+  /** The room's folder: file dialogs start there while no file is open. */
+  folderHandle: unknown;
   status: 'off' | 'starting' | 'on' | 'error';
   error?: string;
   me: string;
@@ -40,6 +42,6 @@ export interface ReplaceRequest {
 
 const newId = () => Array.from(crypto.getRandomValues(new Uint8Array(4)), (b) => b.toString(16).padStart(2, '0')).join('');
 
-export const useCollab = create<CollabState>(() => ({ folder: null, status: 'off', me: newId(), peers: {}, log: [], shared: false, asking: null, incoming: [], askResult: null }));
+export const useCollab = create<CollabState>(() => ({ folderHandle: null, folder: null, status: 'off', me: newId(), peers: {}, log: [], shared: false, asking: null, incoming: [], askResult: null }));
 export const setState = useCollab.setState;
 export const note = (line: string) => setState((s) => ({ log: [...s.log.slice(-30), `${new Date().toLocaleTimeString()} ${line}`] }));

@@ -1,4 +1,5 @@
 import * as Y from 'yjs';
+import { setCurrentFile } from '../model/currentFile';
 import { useStore } from '../model/store';
 import { normalizeModel, type Model } from '../model/types';
 import { applyDiff } from './ydiff';
@@ -60,6 +61,8 @@ export class SharedDiagram {
     Y.applyUpdate(this.doc, update, from);
     this.synced = true;
     this.show();
+    // The diagram on screen is now the room's, not the file we had open: Save must not write it over that file.
+    setCurrentFile(null);
   }
 
   apply(update: Uint8Array, from: string) {
