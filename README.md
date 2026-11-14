@@ -17,7 +17,7 @@ Topico places your systems around a central broker, draws the topics they exchan
 
 ### ▶ [Open the app](https://scodeman.github.io/Topico/)
 
-It starts with a sample landscape you can play with straight away.
+It starts with an empty diagram; the **Sample** button (top left) loads an example landscape to play with.
 
 [![Topico: systems around the central broker, with the topic editor open](docs/images/app.png)](https://scodeman.github.io/Topico/)
 
@@ -37,6 +37,9 @@ Group the endpoints of a business flow into a **chain**, number its links in a *
 Switch the toolbar from **Topics** to **System of System**. Inner systems sit in a central box and outer systems surround it like petals, each with its notes. Arrows list the topics that go in and out.
 
 [![System of System view](docs/images/sos.png)](https://scodeman.github.io/Topico/)
+
+### Edit it together (experiment)
+In Chrome or Edge, click the people icon (top right) and choose a folder your team already shares (OneDrive, SharePoint, a network drive). Everyone who picks the same folder edits the same diagram live, connected browser to browser: the folder is only used to meet, and no server is involved. If nobody is in the room yet, you can then pick one of the diagram files in the folder to work on: it is loaded, **Save** writes back to it in the shared folder, and it is the diagram others get when they join. If someone is already there, you join straight away and get the diagram they are editing. Joining takes the diagram already shared there; each person still saves to their own file. While in a room, **Sample** is disabled, and **Open…** or **New** first asks everyone connected: the diagram is replaced only if they all allow it. It works between computers that can reach each other directly, usually on the same network.
 
 ### Discuss it in place
 Set your name with the user icon (top right), then right-click any system, topic or line on the canvas to leave a comment. Items with unresolved comments carry a small numbered circle: click it to jump to the thread in the right panel, where comments can be replied to, accepted or rejected, and threads closed or removed. Every comment and action keeps its author and date.

@@ -185,7 +185,8 @@ const toggle = (list: string[], id: string) => (list.includes(id) ? list.filter(
 export const useStore = create<Store>()(
   persist(
     immer((set, get) => editGuard(get, {
-      model: sampleModel(),
+      // A first visit starts with an empty diagram; the Sample button loads the example.
+      model: emptyModel(),
       ui: initialUi,
 
       setModel: (m) =>

@@ -1,20 +1,17 @@
-import { useEffect, useRef, useState } from 'react';
+import { useRef } from 'react';
 import { useView } from '../engine/useView';
 import { DiagramIcon, ImageFileIcon, NewIcon, OpenIcon, SampleIcon, SaveAsIcon, SaveIcon } from './Icons';
+import { CollabMenu } from './CollabMenu';
+import { useCollab } from '../collab/state';
 import { UserMenu } from './UserMenu';
 import { resetToEmpty, resetToSample, useStore } from '../model/store';
-import { loadCurrentFile, storeCurrentFile } from '../model/currentFile';
+import { setCurrentFile, useCurrentFile, type FileHandle } from '../model/currentFile';
 
 /* File System Access API (Chrome, Edge): not in every browser nor in TypeScript's DOM types. */
-interface FileHandle {
-  name: string;
-  getFile(): Promise<File>;
-  createWritable(): Promise<{ write(data: string): Promise<void>; close(): Promise<void> }>;
-  requestPermission?(o: { mode: 'readwrite' }): Promise<'granted' | 'denied' | 'prompt'>;
-}
 type PickerTypes = { types: { description: string; accept: Record<string, string[]> }[] };
-type OpenPicker = (o: PickerTypes) => Promise<FileHandle[]>;
-type SavePicker = (o: PickerTypes & { suggestedName: string }) => Promise<FileHandle>;
+/** `startIn`: a folder (or file) handle the dialog opens in. */
+type OpenPicker = (o: PickerTypes & { startIn?: unknown }) => Promise<FileHandle[]>;
+type SavePicker = (o: PickerTypes & { suggestedName: string; startIn?: unknown }) => Promise<FileHandle>;
 const fsa = window as unknown as { showOpenFilePicker?: OpenPicker; showSaveFilePicker?: SavePicker };
 const picker = fsa.showOpenFilePicker && fsa.showSaveFilePicker ? { open: fsa.showOpenFilePicker.bind(window), save: fsa.showSaveFilePicker.bind(window) } : null;
 const JSON_TYPES: PickerTypes = { types: [{ description: 'Topico diagram', accept: { 'application/json': ['.json'] } }] };
@@ -66,22 +63,21 @@ export function Toolbar() {
       'application/xml',
     ),
   );
-  // The current file (Chrome, Edge): the one opened or last saved with the browser's file pickers. Save writes over it.
-  // It is kept across reloads (see currentFile.ts), like the diagram itself.
-  const [opened, setOpenedState] = useState<FileHandle | null>(null);
-  const setOpened = (h: FileHandle | null) => {
-    setOpenedState(h);
-    void storeCurrentFile(h);
-  };
-  useEffect(() => {
-    if (picker) void loadCurrentFile<FileHandle>().then((h) => h && setOpenedState(h));
-  }, []);
+  // The current file (Chrome, Edge): the one opened or last saved with the browser's file pickers, or picked in a
+  // collaboration room's folder. Save writes over it. It is kept across reloads (see currentFile.ts).
+  const opened = useCurrentFile((s) => s.handle);
+  const setOpened = setCurrentFile;
   const fileName = `${base}.topico.json`;
   const writeTo = async (h: FileHandle, json: string) => {
     if ((await h.requestPermission?.({ mode: 'readwrite' })) === 'denied') throw new Error('permission denied');
     const w = await h.createWritable();
     await w.write(json);
     await w.close();
+  };
+  // In a collaboration room, the file dialogs (Open, Save as, Save without a current file) start in the room's folder.
+  const roomStart = () => {
+    const c = useCollab.getState();
+    return c.status === 'on' && c.folderHandle ? { startIn: c.folderHandle } : {};
   };
   const save = (as: boolean) => async () => {
     // Ask to write to the current file first, while the click still counts as the user's gesture.
@@ -90,7 +86,7 @@ export function Toolbar() {
     const json = ex.toJson(model);
     if (!picker) return ex.download(fileName, json, 'application/json');
     try {
-      const h = !as && opened ? opened : await picker.save({ ...JSON_TYPES, suggestedName: opened?.name ?? fileName });
+      const h = !as && opened ? opened : await picker.save({ ...JSON_TYPES, suggestedName: opened?.name ?? fileName, ...roomStart() });
       await writeTo(h, json);
       setOpened(h);
     } catch (e) {
@@ -99,19 +95,36 @@ export function Toolbar() {
     }
   };
 
+  // In a collaboration room, replacing the diagram replaces it for everyone: the others must agree first.
+  const inRoom = useCollab((c) => c.status === 'on');
+  const othersAgree = async (what: string) => {
+    const c = useCollab.getState();
+    if (c.status !== 'on' || !Object.values(c.peers).some((p) => p.state === 'connected')) return true;
+    // The outcome shows in the page (see CollabMenu), not in an alert that Chrome may hold back in a window without focus.
+    return (await (await import('../collab/session')).askReplace(what)).ok;
+  };
   const importJson = async (file: File) => {
+    let data: unknown;
     try {
-      setModel(JSON.parse(await file.text()));
-      return true;
+      data = JSON.parse(await file.text());
     } catch (e) {
       alert(`Could not read ${file.name}: ${(e as Error).message}`);
       return false;
     }
+    if (!(await othersAgree(file.name))) return false;
+    setModel(data as Parameters<typeof setModel>[0]);
+    return true;
+  };
+  const newDiagram = async () => {
+    if (!confirm('Start a new empty diagram? Unsaved changes will be lost.')) return;
+    if (!(await othersAgree('a new empty diagram'))) return;
+    resetToEmpty();
+    forget();
   };
   const open = async () => {
     if (!picker) return fileRef.current?.click();
     try {
-      const [h] = await picker.open(JSON_TYPES);
+      const [h] = await picker.open({ ...JSON_TYPES, ...roomStart() });
       if (await importJson(await h.getFile())) setOpened(h);
     } catch (e) {
       if ((e as Error).name !== 'AbortError') alert(`Could not open the file: ${(e as Error).message}`);
@@ -123,13 +136,19 @@ export function Toolbar() {
     <header className="toolbar">
       <strong className="brand">Topico</strong>
       <div className="tb-group">
-        <button onClick={() => confirm('Start a new empty diagram? Unsaved changes will be lost.') && (resetToEmpty(), forget())} className="icon-btn" title="New: start an empty diagram" aria-label="New">
+        <button onClick={() => void newDiagram()} className="icon-btn" title={inRoom ? 'New: start an empty diagram (everyone in the room must agree)' : 'New: start an empty diagram'} aria-label="New">
           <NewIcon />
         </button>
-        <button onClick={() => confirm('Replace the current diagram with the sample?') && (resetToSample(), forget())} className="icon-btn" title="Sample: load the example diagram" aria-label="Sample">
+        <button
+          onClick={() => confirm('Replace the current diagram with the sample?') && (resetToSample(), forget())}
+          className="icon-btn"
+          disabled={inRoom}
+          title={inRoom ? 'Sample: not available in a collaboration room (it would replace everyone’s diagram)' : 'Sample: load the example diagram'}
+          aria-label="Sample"
+        >
           <SampleIcon />
         </button>
-        <button onClick={() => void open()} className="icon-btn" title="Open: load a Topico JSON file" aria-label="Open">
+        <button onClick={() => void open()} className="icon-btn" title={inRoom ? 'Open: load a Topico JSON file (everyone in the room must agree)' : 'Open: load a Topico JSON file'} aria-label="Open">
           <OpenIcon />
         </button>
         <input
@@ -182,6 +201,7 @@ export function Toolbar() {
           <DiagramIcon /> draw.io
         </button>
       </div>
+      <CollabMenu />
       <UserMenu />
     </header>
   );

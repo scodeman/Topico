@@ -67,6 +67,11 @@ function Help() {
         <li>Double-click the broker (or "Show all") to see everything.</li>
         <li>Use the checkboxes on the left to filter, and ● / ◌ to hide or show.</li>
         <li>Hover a topic to highlight its flows. Scroll to zoom, drag to pan.</li>
+        <li>
+          <b>Collaborate</b> (people icon, top right, Chrome and Edge; experiment): choose a folder your team already shares (OneDrive,
+          SharePoint, a network drive). Everyone who picks the same folder edits the same diagram together, connected directly with no
+          server. Joining takes the diagram already shared there; each person saves to their own file.
+        </li>
       </ul>
     </div>
   );
