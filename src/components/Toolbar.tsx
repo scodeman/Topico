@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useView } from '../engine/useView';
 import { DiagramIcon, ImageFileIcon, NewIcon, OpenIcon, SampleIcon, SaveAsIcon, SaveIcon } from './Icons';
 import { CollabMenu } from './CollabMenu';
+import { useCollab } from '../collab/state';
 import { UserMenu } from './UserMenu';
 import { resetToEmpty, resetToSample, useStore } from '../model/store';
 import { loadCurrentFile, storeCurrentFile } from '../model/currentFile';
@@ -100,14 +101,31 @@ export function Toolbar() {
     }
   };
 
+  // In a collaboration room, replacing the diagram replaces it for everyone: the others must agree first.
+  const inRoom = useCollab((c) => c.status === 'on');
+  const othersAgree = async (what: string) => {
+    const c = useCollab.getState();
+    if (c.status !== 'on' || !Object.values(c.peers).some((p) => p.state === 'connected')) return true;
+    // The outcome shows in the page (see CollabMenu), not in an alert that Chrome may hold back in a window without focus.
+    return (await (await import('../collab/session')).askReplace(what)).ok;
+  };
   const importJson = async (file: File) => {
+    let data: unknown;
     try {
-      setModel(JSON.parse(await file.text()));
-      return true;
+      data = JSON.parse(await file.text());
     } catch (e) {
       alert(`Could not read ${file.name}: ${(e as Error).message}`);
       return false;
     }
+    if (!(await othersAgree(file.name))) return false;
+    setModel(data as Parameters<typeof setModel>[0]);
+    return true;
+  };
+  const newDiagram = async () => {
+    if (!confirm('Start a new empty diagram? Unsaved changes will be lost.')) return;
+    if (!(await othersAgree('a new empty diagram'))) return;
+    resetToEmpty();
+    forget();
   };
   const open = async () => {
     if (!picker) return fileRef.current?.click();
@@ -124,13 +142,19 @@ export function Toolbar() {
     <header className="toolbar">
       <strong className="brand">Topico</strong>
       <div className="tb-group">
-        <button onClick={() => confirm('Start a new empty diagram? Unsaved changes will be lost.') && (resetToEmpty(), forget())} className="icon-btn" title="New: start an empty diagram" aria-label="New">
+        <button onClick={() => void newDiagram()} className="icon-btn" title={inRoom ? 'New: start an empty diagram (everyone in the room must agree)' : 'New: start an empty diagram'} aria-label="New">
           <NewIcon />
         </button>
-        <button onClick={() => confirm('Replace the current diagram with the sample?') && (resetToSample(), forget())} className="icon-btn" title="Sample: load the example diagram" aria-label="Sample">
+        <button
+          onClick={() => confirm('Replace the current diagram with the sample?') && (resetToSample(), forget())}
+          className="icon-btn"
+          disabled={inRoom}
+          title={inRoom ? 'Sample: not available in a collaboration room (it would replace everyone’s diagram)' : 'Sample: load the example diagram'}
+          aria-label="Sample"
+        >
           <SampleIcon />
         </button>
-        <button onClick={() => void open()} className="icon-btn" title="Open: load a Topico JSON file" aria-label="Open">
+        <button onClick={() => void open()} className="icon-btn" title={inRoom ? 'Open: load a Topico JSON file (everyone in the room must agree)' : 'Open: load a Topico JSON file'} aria-label="Open">
           <OpenIcon />
         </button>
         <input

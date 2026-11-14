@@ -284,7 +284,7 @@ The original request did not settle these points. They were decided during the i
 | Date | Version | Change |
 |---|---|---|
 | 2026-11-07 | 0.1 | Initial build covering §4.1–4.6, §4.8 and §4.11. Reference material moved to `docs/spec/`. |
-| 2026-11-13 | 0.25 | Editing needs a user name (COM-09). Save / Save as over the current file (EXP-06). View options moved to a dock at the bottom of the canvas, which can be folded. The draw.io sketch-style option is removed (EXP-02). |
+| 2026-11-13 | 0.25 | Editing needs a user name (COM-09). Save / Save as over the current file (EXP-06). View options moved to a dock at the bottom of the canvas, which can be folded. The draw.io sketch-style option is removed (EXP-02). Experimental live collaboration through a shared folder (WebRTC + Yjs). |
 | 2026-11-11 | 0.24 | Comments on every entity and line (COM-01 to COM-08). The legend lists only chains. |
 | 2026-11-11 | 0.23 | The main view is called **Topics** in the toolbar switch (Topics / System of System) and its "Back to" links. |
 | 2026-11-11 | 0.22 | Bundles and chains can be rearranged by drag and drop (EXL-16). |

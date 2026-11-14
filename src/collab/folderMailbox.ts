@@ -27,7 +27,21 @@ export interface PeerNote {
   name: string;
   /** Last heartbeat, ms since epoch. */
   at: number;
+  /** The browser (profile) the tab runs in, and when it joined: a reloaded tab is a new peer from the same browser. */
+  browser?: string;
+  since?: number;
 }
+
+/** A live tab rewrites its note every few seconds: one silent for longer than this, from a browser where a newer tab
+    has joined since, was left behind by a tab that reloaded. (Two live tabs of one browser, like two private windows,
+    share the browser id: the delay keeps the other one from being mistaken for a leftover while it is still alive.) */
+export const LEFTOVER_MS = 8000;
+
+/** A peer note left behind by a tab that has since reloaded (or rejoined): same browser, silent since a newer one joined. */
+export const replaced = (p: PeerNote, all: PeerNote[], now: number) =>
+  !!p.browser &&
+  now - p.at > LEFTOVER_MS &&
+  all.some((q) => q.id !== p.id && q.browser === p.browser && (q.since ?? 0) > (p.since ?? 0) && p.at < (q.since ?? 0));
 export interface SignalNote {
   sdp: RTCSessionDescriptionInit;
   /** When the offer was made: an answer names the offer it replies to. */

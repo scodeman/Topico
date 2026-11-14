@@ -69,8 +69,8 @@ function Help() {
         <li>Hover a topic to highlight its flows. Scroll to zoom, drag to pan.</li>
         <li>
           <b>Collaborate</b> (people icon, top right, Chrome and Edge; experiment): choose a folder your team already shares (OneDrive,
-          SharePoint, a network drive). Everyone who picks the same folder connects directly, with no server. Only who is online is
-          shared for now, not the diagram.
+          SharePoint, a network drive). Everyone who picks the same folder edits the same diagram together, connected directly with no
+          server. Joining takes the diagram already shared there; each person saves to their own file.
         </li>
       </ul>
     </div>
