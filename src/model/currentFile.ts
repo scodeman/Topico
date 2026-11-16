@@ -45,6 +45,14 @@ export interface FileHandle {
   requestPermission?(o: { mode: 'readwrite' }): Promise<'granted' | 'denied' | 'prompt'>;
 }
 
+/** The browser has the file pickers but refuses them (SecurityError): a setting or a company policy blocks file
+    access for this site (Edge: "File editing" permission, DefaultFileSystemRead/WriteGuardSetting policies). The app
+    then falls back to the classic file input and downloads, as in browsers without the pickers. */
+export const useFsaBlocked = create<{ blocked: boolean }>(() => ({ blocked: false }));
+export const isFsaBlocked = (e: unknown) => (e as Error)?.name === 'SecurityError' || (e as Error)?.name === 'NotAllowedError';
+export const FSA_BLOCKED_HELP =
+  'This browser blocks access to files and folders for this site, often because of a company policy (in Edge: Settings → Cookies and site permissions → File editing, or the DefaultFileSystemReadGuardSetting / DefaultFileSystemWriteGuardSetting policies, see edge://policy). Edge in InPrivate or Application Guard can block it too.';
+
 /** The current file, shared by the toolbar (Open, Save) and the Collaborate panel (a file picked in the room's folder). */
 export const useCurrentFile = create<{ handle: FileHandle | null }>(() => ({ handle: null }));
 export const setCurrentFile = (h: FileHandle | null) => {

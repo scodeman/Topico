@@ -5,7 +5,7 @@ import { CollabMenu } from './CollabMenu';
 import { useCollab } from '../collab/state';
 import { UserMenu } from './UserMenu';
 import { resetToEmpty, resetToSample, useStore } from '../model/store';
-import { setCurrentFile, useCurrentFile, type FileHandle } from '../model/currentFile';
+import { FSA_BLOCKED_HELP, isFsaBlocked, setCurrentFile, useCurrentFile, useFsaBlocked, type FileHandle } from '../model/currentFile';
 
 /* File System Access API (Chrome, Edge): not in every browser nor in TypeScript's DOM types. */
 type PickerTypes = { types: { description: string; accept: Record<string, string[]> }[] };
@@ -13,7 +13,7 @@ type PickerTypes = { types: { description: string; accept: Record<string, string
 type OpenPicker = (o: PickerTypes & { startIn?: unknown }) => Promise<FileHandle[]>;
 type SavePicker = (o: PickerTypes & { suggestedName: string; startIn?: unknown }) => Promise<FileHandle>;
 const fsa = window as unknown as { showOpenFilePicker?: OpenPicker; showSaveFilePicker?: SavePicker };
-const picker = fsa.showOpenFilePicker && fsa.showSaveFilePicker ? { open: fsa.showOpenFilePicker.bind(window), save: fsa.showSaveFilePicker.bind(window) } : null;
+const fsaPicker = fsa.showOpenFilePicker && fsa.showSaveFilePicker ? { open: fsa.showOpenFilePicker.bind(window), save: fsa.showSaveFilePicker.bind(window) } : null;
 const JSON_TYPES: PickerTypes = { types: [{ description: 'Topico diagram', accept: { 'application/json': ['.json'] } }] };
 
 export function Toolbar() {
@@ -21,6 +21,10 @@ export function Toolbar() {
   const setUi = useStore((s) => s.setUi);
   const setModel = useStore((s) => s.setModel);
   const fileRef = useRef<HTMLInputElement>(null);
+  // Pickers refused by the browser (policy, site setting): behave as in browsers without them.
+  const blocked = useFsaBlocked((s) => s.blocked);
+  const picker = blocked ? null : fsaPicker;
+  const block = () => useFsaBlocked.setState({ blocked: true });
   const base = (model.centre.name || 'topico').toLowerCase().replace(/[^a-z0-9]+/g, '-');
   const suffix = chainLayout
     ? `-chain-${chainLayout.chainName.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`
@@ -91,6 +95,13 @@ export function Toolbar() {
       setOpened(h);
     } catch (e) {
       if ((e as Error).name === 'AbortError') return;
+      if (isFsaBlocked(e)) {
+        // Writing is blocked (e.g. Edge policy DefaultFileSystemWriteGuardSetting = 2), even over a file opened earlier.
+        block();
+        setOpened(null);
+        alert(`${FSA_BLOCKED_HELP}\n\nThe diagram is downloaded instead.`);
+        return ex.download(fileName, json, 'application/json');
+      }
       if (confirm(`Could not save: ${(e as Error).message}\nDownload a copy instead?`)) ex.download(fileName, json, 'application/json');
     }
   };
@@ -127,6 +138,11 @@ export function Toolbar() {
       const [h] = await picker.open({ ...JSON_TYPES, ...roomStart() });
       if (await importJson(await h.getFile())) setOpened(h);
     } catch (e) {
+      if (isFsaBlocked(e)) {
+        // Fall back to the classic file dialog (it still works when file access is blocked).
+        block();
+        return fileRef.current?.click();
+      }
       if ((e as Error).name !== 'AbortError') alert(`Could not open the file: ${(e as Error).message}`);
     }
   };

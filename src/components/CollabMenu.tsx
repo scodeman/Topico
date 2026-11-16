@@ -62,7 +62,7 @@ function ReplaceDialogs() {
     </>
   );
 }
-import { loadHandle, setCurrentFile, storeHandle, useCurrentFile, type FileHandle } from '../model/currentFile';
+import { FSA_BLOCKED_HELP, isFsaBlocked, loadHandle, setCurrentFile, storeHandle, useCurrentFile, useFsaBlocked, type FileHandle } from '../model/currentFile';
 import { canEdit, useStore } from '../model/store';
 
 /* Experiment: meet other Topico users through a shared folder (see collab/session.ts). Chrome and Edge only. */
@@ -115,6 +115,7 @@ const STATE_LABEL: Record<PeerView['state'], string> = {
 
 export function CollabMenu() {
   const [open, setOpen] = useState(false);
+  const fsaBlocked = useFsaBlocked((s) => s.blocked);
   const [remembered, setRemembered] = useState<DirHandle | null>(null);
   const ref = useRef<HTMLDivElement>(null);
   const { folder, status, error, peers, log, shared } = useCollab();
@@ -174,7 +175,8 @@ export function CollabMenu() {
       const choice = files.some((f) => f.name === current) ? current! : files.length === 1 ? files[0].name : '';
       setPending({ dir, files, choice });
     } catch (e) {
-      if ((e as Error).name !== 'AbortError') alert(`Could not use this folder: ${(e as Error).message}`);
+      if (isFsaBlocked(e)) useFsaBlocked.setState({ blocked: true });
+      else if ((e as Error).name !== 'AbortError') alert(`Could not use this folder: ${(e as Error).message}`);
     }
   };
   const joinWithChoice = async () => {
@@ -320,10 +322,16 @@ export function CollabMenu() {
                     Rejoin {remembered.name}
                   </button>
                 )}
-                <button className={remembered ? '' : 'primary'} onClick={() => void choose()}>
+                <button
+                  className={remembered ? '' : 'primary'}
+                  onClick={() => void choose()}
+                  disabled={fsaBlocked}
+                  title={fsaBlocked ? 'This browser blocks folder access for this site' : undefined}
+                >
                   Choose folder…
                 </button>
               </div>
+              {fsaBlocked && <p className="small danger-text">Folder rooms are not available: {FSA_BLOCKED_HELP}</p>}
               <p className="muted small">Works between computers that can reach each other directly (usually the same network).</p>
             </>
           )}
